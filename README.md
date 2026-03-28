@@ -15,7 +15,7 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 - [Performance Characteristics](#performance-characteristics)
 - [How Data Flows Through The App](#how-data-flows-through-the-app)
 - [Startup, Sync, Cache, And Snapshot Lifecycle](#startup-sync-cache-and-snapshot-lifecycle)
-- [How MunkiReport Enrichment Is Merged](#how-munkireport-enrichment-is-merged)
+- [MunkiReport SimpleMDM Module](#munkireport-simplemdm-module)
 - [Quickstart](#quickstart)
 - [Deployment Examples](#deployment-examples)
 - [Feature To Data Source Mapping](#feature-to-data-source-mapping)
@@ -105,130 +105,7 @@ On first launch, the app shows a setup flow that writes the SimpleMDM API key to
 
 ### Connecting To The Optional MunkiReport Module
 
-If you want supplemental MunkiReport enrichment, use `SimpleMDM + MunkiReport Module` in `Settings > Server & API`.
-
-Step by step:
-
-1. Open the app and go to `Settings > Server & API`.
-2. Change `Backend Mode` to `SimpleMDM + MunkiReport Module`.
-3. Enter your normal `SimpleMDM API Key`.
-4. In `MunkiReport Base URL`, enter the MunkiReport site root.
-   Example for rewrite-enabled routing: `https://munkireport.example.com`
-   Example for non-rewrite routing: `https://munkireport.example.com/index.php?`
-5. Leave `Module Path Prefix` set to `/module/simplemdm` unless your MunkiReport deployment is intentionally customized.
-6. Choose one MunkiReport authentication method.
-   Header-based auth:
-   Set `Auth Header Name` and `Auth Header Value` to whatever your MunkiReport deployment expects.
-   Cookie-based auth:
-   Leave the auth-header fields blank and paste the full cookie value into `Cookie Header`.
-7. Save the configuration.
-8. Return to the dashboard or settings screens and let the app refresh.
-9. Confirm the direct SimpleMDM connection still works first.
-   Devices should load even if MunkiReport enrichment is unavailable.
-10. Confirm module enrichment is working.
-   `Settings > Supplemental Enrichment (A)` should begin showing detected-source status instead of the generic unavailable message.
-   `Settings` should show `Module Data: Available` once module telemetry or supplemental status is loaded.
-   Module-backed dashboard widgets such as compliance, sync health, supplemental overview, or AppleCare should start populating when the module responds successfully.
-
-Quickest safe default:
-
-- `MunkiReport Base URL`: your MunkiReport root
-- `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: blank unless your MunkiReport deployment requires it
-- `Auth Header Value`: blank unless your MunkiReport deployment requires it
-- `Cookie Header`: blank unless you are authenticating with a MunkiReport session cookie
-
-Use these fields as follows:
-
-- `MunkiReport Base URL`
-  - enter the MunkiReport site root
-  - rewrite-enabled example:
-    - `https://munkireport.example.com`
-  - non-rewrite example:
-    - `https://munkireport.example.com/index.php?`
-- `Module Path Prefix`
-  - leave this at the default unless your MunkiReport routing is customized
-  - default:
-    - `/module/simplemdm`
-- `Auth Header Name`
-  - optional
-  - use this only if your MunkiReport deployment expects an auth header on module requests
-- `Auth Header Value`
-  - optional
-  - if your deployment expects a header value, put it here
-- `Cookie Header`
-  - optional
-  - use this when you want the app to send an authenticated MunkiReport session cookie
-
-Practical examples:
-
-- Header-authenticated deployment
-  - `MunkiReport Base URL`: `https://munkireport.example.com`
-  - `Module Path Prefix`: `/module/simplemdm`
-  - `Auth Header Name`: whatever your MunkiReport deployment expects
-  - `Auth Header Value`: the matching token or secret
-  - `Cookie Header`: leave blank
-- Cookie-authenticated deployment
-  - `MunkiReport Base URL`: `https://munkireport.example.com`
-  - `Module Path Prefix`: `/module/simplemdm`
-  - `Auth Header Name`: leave blank unless your environment also requires one
-  - `Auth Header Value`: leave blank
-  - `Cookie Header`: full cookie header value such as `ci_session=...; other_cookie=...`
-- Non-rewrite MunkiReport routing
-  - `MunkiReport Base URL`: `https://munkireport.example.com/index.php?`
-  - `Module Path Prefix`: `/module/simplemdm`
-
-Important integration notes:
-
-- the app expects the MunkiReport site root in `MunkiReport Base URL`, not the full endpoint URL
-- the app builds module requests as:
-  - `{MunkiReport Base URL}/{Module Path Prefix}/{route}`
-- the app reads module enrichment routes; it does not use the module's admin-only device passthrough API for its core device management
-- the app still talks directly to SimpleMDM for fleet data and write actions
-- MunkiReport is only an enrichment layer in this app
-
-What the app reads from the module today:
-
-- dashboard and enrichment JSON routes for:
-  - sync telemetry
-  - command status
-  - compliance
-  - assignment-group stats
-  - resource-type stats
-  - OS-security stats
-  - supplemental status
-  - supplemental overview
-  - AppleCare stats
-- per-device module routes such as:
-  - `get_device_resources/{serial}`
-
-Compatibility note:
-
-- this app expects a current `simplemdm` module build with the newer enrichment/data routes used by the app
-- if module-backed widgets do not load but direct SimpleMDM data does, update the MunkiReport `simplemdm` module first
-
-Auth note:
-
-- the module's normal read routes are authenticated routes
-- in practice, your header or cookie must be enough for your MunkiReport deployment to treat the request as authorized
-- if your environment uses the default header name `X-SIMPLEMDM-API-KEY`, the app can reuse the SimpleMDM API key as the header value when the header-value field is left blank
-- only rely on that fallback if your MunkiReport deployment is explicitly configured to accept it
-
-How to verify the connection after saving:
-
-- the app should still load devices even if MunkiReport is unavailable, because direct SimpleMDM remains primary
-- module-backed dashboard widgets should begin populating when the module responds successfully
-- `Settings > Supplemental Enrichment (A)` should stop showing the generic "not available" message and start showing detected source status
-- `Settings` should report `Module Data: Available` once module telemetry or supplemental status is loaded
-
-If it does not work:
-
-- confirm the base URL is the MunkiReport root, not a specific module endpoint
-- if your MunkiReport instance does not use rewritten routes, include `index.php?` in the base URL
-- keep the module path prefix at `/module/simplemdm` unless you know it is different in your deployment
-- confirm your auth header or cookie is valid for authenticated module GET requests
-- confirm the MunkiReport `simplemdm` module is current enough to expose the enrichment routes this app reads
-- if browser-based MunkiReport pages work but the app does not, compare the exact header or cookie requirements used by your MunkiReport deployment
+If you use the MunkiReport `simplemdm` module, the setup, connection, examples, and usage notes are grouped later in [MunkiReport SimpleMDM Module](#munkireport-simplemdm-module).
 
 ### Persistence And Startup Strategy
 
@@ -973,7 +850,64 @@ When a sync session goes idle, it can be finalized into a summary that records:
 
 Recent summaries are stored in `SyncLog` and surfaced in Settings and dashboard sync-health views.
 
-## How MunkiReport Enrichment Is Merged
+## MunkiReport SimpleMDM Module
+
+### Connecting And Setup
+
+If you want supplemental MunkiReport enrichment, use `SimpleMDM + MunkiReport Module` in `Settings > Server & API`.
+
+Step by step:
+
+1. Open the app and go to `Settings > Server & API`.
+2. Change `Backend Mode` to `SimpleMDM + MunkiReport Module`.
+3. Enter your normal `SimpleMDM API Key`.
+4. In `MunkiReport Base URL`, enter the MunkiReport site root.
+   Example for rewrite-enabled routing: `https://munkireport.example.com`
+   Example for non-rewrite routing: `https://munkireport.example.com/index.php?`
+5. Leave `Module Path Prefix` set to `/module/simplemdm` unless your MunkiReport deployment is intentionally customized.
+6. Choose one MunkiReport authentication method.
+   Header-based auth:
+   Set `Auth Header Name` and `Auth Header Value` to whatever your MunkiReport deployment expects.
+   Cookie-based auth:
+   Leave the auth-header fields blank and paste the full cookie value into `Cookie Header`.
+7. Save the configuration.
+8. Return to the dashboard or settings screens and let the app refresh.
+9. Confirm the direct SimpleMDM connection still works first.
+   Devices should load even if MunkiReport enrichment is unavailable.
+10. Confirm module enrichment is working.
+   `Settings > Supplemental Enrichment (A)` should begin showing detected-source status instead of the generic unavailable message.
+   `Settings` should show `Module Data: Available` once module telemetry or supplemental status is loaded.
+   Module-backed dashboard widgets such as compliance, sync health, supplemental overview, or AppleCare should start populating when the module responds successfully.
+
+Quickest safe default:
+
+- `MunkiReport Base URL`: your MunkiReport root
+- `Module Path Prefix`: `/module/simplemdm`
+- `Auth Header Name`: blank unless your MunkiReport deployment requires it
+- `Auth Header Value`: blank unless your MunkiReport deployment requires it
+- `Cookie Header`: blank unless you are authenticating with a MunkiReport session cookie
+
+Use these fields as follows:
+
+- `MunkiReport Base URL`
+  - enter the MunkiReport site root
+  - rewrite-enabled example:
+    - `https://munkireport.example.com`
+  - non-rewrite example:
+    - `https://munkireport.example.com/index.php?`
+- `Module Path Prefix`
+  - leave this at the default unless your MunkiReport routing is customized
+  - default:
+    - `/module/simplemdm`
+- `Auth Header Name`
+  - optional
+  - use this only if your MunkiReport deployment expects an auth header on module requests
+- `Auth Header Value`
+  - optional
+  - if your deployment expects a header value, put it here
+- `Cookie Header`
+  - optional
+  - use this when you want the app to send an authenticated MunkiReport session cookie
 
 ### What MunkiReport Does Not Replace
 
@@ -996,6 +930,20 @@ The module adds secondary context that is useful for:
 - source-detection status
 - AppleCare/supplemental coverage views
 - device connected-resource summaries
+
+In practice, this can include information that the MunkiReport `simplemdm` module derives from or joins with other installed MunkiReport modules. When that enrichment is exposed through the `simplemdm` module routes, `ReportSimpleMDM` can surface it in the app as supplemental context.
+
+### How SimpleMDM And The Module Work Together
+
+The practical model is:
+
+1. `ReportSimpleMDM` connects directly to the SimpleMDM API for the fleet, device detail, management resources, and write actions.
+2. If MunkiReport is configured, the app also calls the MunkiReport `simplemdm` module for supplemental dashboard and device-context data.
+3. The app keeps direct SimpleMDM data authoritative.
+4. The app renders module data as additional context rather than replacing the base record.
+5. If the module is unavailable, direct SimpleMDM workflows still continue to work.
+
+That means the two systems are not peers inside the app. SimpleMDM is the operational backend, while the MunkiReport `simplemdm` module is an optional enrichment layer that can also expose related context coming from other installed MunkiReport modules.
 
 ### Merge Model
 
@@ -1054,7 +1002,104 @@ Module data is not blindly merged into base device objects. Instead, it is displ
 - supplemental-enrichment status views
 - device connected-resource summaries
 
+That can include downstream context sourced from other MunkiReport modules when the `simplemdm` module exposes those relationships or summaries.
+
 This is an important design choice because it prevents supplemental data from overriding core SimpleMDM truth while still making the enrichment visible where it is useful.
+
+### Verification After Setup
+
+- the app should still load devices even if MunkiReport is unavailable, because direct SimpleMDM remains primary
+- module-backed dashboard widgets should begin populating when the module responds successfully
+- `Settings > Supplemental Enrichment (A)` should stop showing the generic "not available" message and start showing detected source status
+- `Settings` should report `Module Data: Available` once module telemetry or supplemental status is loaded
+
+### Auth And Compatibility Notes
+
+- the app expects the MunkiReport site root in `MunkiReport Base URL`, not the full endpoint URL
+- the app reads module enrichment routes; it does not use the module's admin-only device passthrough API for its core device management
+- the app still talks directly to SimpleMDM for fleet data and write actions
+- MunkiReport is only an enrichment layer in this app
+- some enrichment visible in the app may ultimately reflect data from other installed MunkiReport modules, as long as the `simplemdm` module exposes that information through its own routes
+- the app expects a current `simplemdm` module build with the newer enrichment/data routes used by the app
+- if module-backed widgets do not load but direct SimpleMDM data does, update the MunkiReport `simplemdm` module first
+- the module's normal read routes are authenticated routes
+- in practice, your header or cookie must be enough for your MunkiReport deployment to treat the request as authorized
+- if your environment uses the default header name `X-SIMPLEMDM-API-KEY`, the app can reuse the SimpleMDM API key as the header value when the header-value field is left blank
+- only rely on that fallback if your MunkiReport deployment is explicitly configured to accept it
+
+### Deployment Examples For The Module
+
+#### Example 1: MunkiReport With Header Auth
+
+Use this when your MunkiReport deployment expects an auth header on module GET requests.
+
+- `Backend Mode`: `SimpleMDM + MunkiReport Module`
+- `SimpleMDM API Key`: your real SimpleMDM API key
+- `MunkiReport Base URL`: `https://munkireport.example.com`
+- `Module Path Prefix`: `/module/simplemdm`
+- `Auth Header Name`: your MunkiReport-required header name
+- `Auth Header Value`: your MunkiReport-required header value
+- `Cookie Header`: blank
+
+Expected result:
+
+- direct SimpleMDM data loads first
+- module-backed enrichment loads if the module accepts the header
+
+#### Example 2: MunkiReport With Session Cookie
+
+Use this when module requests need to look like an authenticated MunkiReport browser session.
+
+- `Backend Mode`: `SimpleMDM + MunkiReport Module`
+- `SimpleMDM API Key`: your real SimpleMDM API key
+- `MunkiReport Base URL`: `https://munkireport.example.com`
+- `Module Path Prefix`: `/module/simplemdm`
+- `Auth Header Name`: blank unless also required
+- `Auth Header Value`: blank unless also required
+- `Cookie Header`: full cookie header string such as `ci_session=...; other_cookie=...`
+
+Expected result:
+
+- direct SimpleMDM data loads first
+- module enrichment loads only if the cookie is valid and accepted for module routes
+
+#### Example 3: Non-Rewrite MunkiReport Routing
+
+Use this when the MunkiReport deployment requires `index.php?` in route construction.
+
+- `Backend Mode`: `SimpleMDM + MunkiReport Module`
+- `MunkiReport Base URL`: `https://munkireport.example.com/index.php?`
+- `Module Path Prefix`: `/module/simplemdm`
+
+Expected request shape:
+
+- `https://munkireport.example.com/index.php?/module/simplemdm/get_sync_telemetry`
+
+#### Example 4: `X-SIMPLEMDM-API-KEY` Fallback Pattern
+
+Use this only if your MunkiReport deployment is intentionally configured to accept the same SimpleMDM API key header on module reads.
+
+- `Backend Mode`: `SimpleMDM + MunkiReport Module`
+- `SimpleMDM API Key`: your real SimpleMDM API key
+- `MunkiReport Base URL`: `https://munkireport.example.com`
+- `Module Path Prefix`: `/module/simplemdm`
+- `Auth Header Name`: `X-SIMPLEMDM-API-KEY`
+- `Auth Header Value`: leave blank
+- `Cookie Header`: blank
+
+Expected behavior:
+
+- `ReportSimpleMDM` can reuse the direct API key as the header value on module requests
+- this should only be used when your MunkiReport deployment explicitly supports that pattern
+
+### If It Does Not Work
+
+- confirm the base URL is the MunkiReport root, not a specific module endpoint
+- if your MunkiReport instance does not use rewritten routes, include `index.php?` in the base URL
+- keep the module path prefix at `/module/simplemdm` unless you know it is different in your deployment
+- confirm your auth header or cookie is valid for authenticated module GET requests
+- confirm the MunkiReport `simplemdm` module is current enough to expose the enrichment routes this app reads
+- if browser-based MunkiReport pages work but the app does not, compare the exact header or cookie requirements used by your MunkiReport deployment
 
 ## Quickstart
 
@@ -1100,68 +1145,7 @@ Expected result:
 - all core `ReportSimpleMDM` functionality should work
 - no module-backed enrichment widgets will populate
 
-### Example 2: MunkiReport With Header Auth
-
-Use this when your MunkiReport deployment expects an auth header on module GET requests.
-
-- `Backend Mode`: `SimpleMDM + MunkiReport Module`
-- `SimpleMDM API Key`: your real SimpleMDM API key
-- `MunkiReport Base URL`: `https://munkireport.example.com`
-- `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: your MunkiReport-required header name
-- `Auth Header Value`: your MunkiReport-required header value
-- `Cookie Header`: blank
-
-Expected result:
-
-- direct SimpleMDM data loads first
-- module-backed enrichment loads if the module accepts the header
-
-### Example 3: MunkiReport With Session Cookie
-
-Use this when module requests need to look like an authenticated MunkiReport browser session.
-
-- `Backend Mode`: `SimpleMDM + MunkiReport Module`
-- `SimpleMDM API Key`: your real SimpleMDM API key
-- `MunkiReport Base URL`: `https://munkireport.example.com`
-- `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: blank unless also required
-- `Auth Header Value`: blank unless also required
-- `Cookie Header`: full cookie header string such as `ci_session=...; other_cookie=...`
-
-Expected result:
-
-- direct SimpleMDM data loads first
-- module enrichment loads only if the cookie is valid and accepted for module routes
-
-### Example 4: Non-Rewrite MunkiReport Routing
-
-Use this when the MunkiReport deployment requires `index.php?` in route construction.
-
-- `Backend Mode`: `SimpleMDM + MunkiReport Module`
-- `MunkiReport Base URL`: `https://munkireport.example.com/index.php?`
-- `Module Path Prefix`: `/module/simplemdm`
-
-Expected request shape:
-
-- `https://munkireport.example.com/index.php?/module/simplemdm/get_sync_telemetry`
-
-### Example 5: `X-SIMPLEMDM-API-KEY` Fallback Pattern
-
-Use this only if your MunkiReport deployment is intentionally configured to accept the same SimpleMDM API key header on module reads.
-
-- `Backend Mode`: `SimpleMDM + MunkiReport Module`
-- `SimpleMDM API Key`: your real SimpleMDM API key
-- `MunkiReport Base URL`: `https://munkireport.example.com`
-- `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: `X-SIMPLEMDM-API-KEY`
-- `Auth Header Value`: leave blank
-- `Cookie Header`: blank
-
-Expected behavior:
-
-- `ReportSimpleMDM` can reuse the direct API key as the header value on module requests
-- this should only be used when your MunkiReport deployment explicitly supports that pattern
+For all MunkiReport `simplemdm` module examples and setup details, see [MunkiReport SimpleMDM Module](#munkireport-simplemdm-module).
 
 ## Feature To Data Source Mapping
 
