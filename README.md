@@ -1,6 +1,6 @@
-# ReportSimpleMDM
+# Report-SimpleMDM
 
-ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS and iOS. Its primary purpose is to give admins a fast, operator-focused view of fleet state while also exposing a large amount of the SimpleMDM API surface through native workflows, an API catalog, and runnable endpoint presets.
+Report-SimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS and iOS. Its primary purpose is to give admins a fast, operator-focused view of fleet state while also exposing a large amount of the SimpleMDM API surface through native workflows, an API catalog, and runnable endpoint presets.
 
 The app is designed first as a standalone SimpleMDM operations client. Optional MunkiReport enrichment is supported, but it is additive rather than foundational.
 
