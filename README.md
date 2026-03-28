@@ -29,15 +29,11 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 - [Architecture Diagram](#architecture-diagram)
 - [Troubleshooting Recipes](#troubleshooting-recipes)
 - [Glossary](#glossary)
-- [Contributor Architecture Notes](#contributor-architecture-notes)
 - [Changelog And Release History](#changelog-and-release-history)
 - [Validation Checklist](#validation-checklist)
-- [Contributor Notes](#contributor-notes)
 - [Important Operational Details](#important-operational-details)
 - [Security And Storage](#security-and-storage)
 - [Current Boundaries And Caveats](#current-boundaries-and-caveats)
-- [Tests In The Repository](#tests-in-the-repository)
-- [Build Notes](#build-notes)
 - [Bottom Line](#bottom-line)
 - [Connect With Me](#connect-with-me)
 
@@ -118,14 +114,7 @@ The app is designed to be usable on larger fleets and slower networks. It uses:
 - deferred loading of secondary dashboard resources after the initial device snapshot appears
 - sync summaries that track request counts, request category, duration, and errors
 
-The current persistence model includes:
-
-- `PersistentDevice`
-- `PersistentLaunchSnapshot`
-- `PersistentResourceRecord`
-- `PersistentResourceFamilyMetadata`
-- `SmartGroup`
-- `SyncLog`
+The current persistence model includes cached fleet data, launch snapshots, resource records, smart-group data, and sync history.
 
 ## Platform Support
 
@@ -694,7 +683,7 @@ The direct SimpleMDM path is responsible for:
 - loading per-device subresources
 - executing all direct write operations
 
-The app configures a shared `SimpleMDMService` instance at startup. That service owns:
+The app configures a shared service layer at startup. That layer owns:
 
 - current live device state
 - dashboard snapshot state
@@ -735,10 +724,10 @@ The key rule is:
 At a high level, the startup flow is:
 
 1. The app creates the SwiftData container.
-2. `Settings` loads saved configuration from user defaults and keychain.
-3. `SimpleMDMService` is created and attached to the environment.
-4. `ContentView` decides whether to show the setup screen or the main tab UI.
-5. `MainTabView` calls `service.configure(...)` with the current settings.
+2. The app loads saved configuration from user defaults and keychain.
+3. The shared service layer is created and attached to the app environment.
+4. The app decides whether to show the setup screen or the main tab UI.
+5. The current settings are applied to the service layer.
 6. The app waits briefly so the first frame can render cleanly.
 7. `ensureInitialLoad()` begins the initial data process.
 8. Deferred dashboard resources are scheduled after launch.
@@ -848,7 +837,7 @@ When a sync session goes idle, it can be finalized into a summary that records:
 - host
 - source such as manual or background
 
-Recent summaries are stored in `SyncLog` and surfaced in Settings and dashboard sync-health views.
+Recent summaries are stored locally and surfaced in Settings and dashboard sync-health views.
 
 ## MunkiReport SimpleMDM Module
 
@@ -952,7 +941,7 @@ The merge model is intentionally simple:
 1. Load direct SimpleMDM data first or in parallel.
 2. Load optional module JSON routes.
 3. Decode module payloads into dedicated enrichment models.
-4. Publish those models into `moduleDashboardData` or device-connected-resource state.
+4. Publish those models into dashboard enrichment or device-connected-resource state.
 5. Show module widgets only when relevant data exists.
 6. Fall back to direct-only views when module data is absent.
 
@@ -1185,15 +1174,15 @@ The table below summarizes where major app features get their data.
 ### Locally Derived Or Cached
 
 - Fleet launch snapshot
-  - persisted `PersistentLaunchSnapshot`
+  - persisted launch snapshot
 - Cached device rows
-  - persisted `PersistentDevice`
+  - persisted cached devices
 - Cached resource records
-  - persisted `PersistentResourceRecord`
+  - persisted resource records
 - Smart groups
-  - persisted `SmartGroup`
+  - persisted local smart-group definitions
 - Sync history
-  - persisted `SyncLog`
+  - persisted sync history
 - Installed-app grouping and assignment-derived state
   - derived in service memory and cached per device
 - Freshness and TTL state
@@ -1353,110 +1342,110 @@ Required for:
 
 ## Endpoint Appendix
 
-This appendix is specifically about `ReportSimpleMDM` feature wiring: feature area, primary `SimpleMDMService` method, and the exact upstream route or route pattern used by the app.
+This appendix summarizes the external SimpleMDM and MunkiReport routes the app uses. It is included for integration visibility rather than source-level implementation detail.
 
 ### Direct SimpleMDM Feature Wiring
 
-| Feature | Service method | Upstream route |
-|---|---|---|
-| Initial/default device fleet load | `getDevices(query:)` | `GET /api/v1/devices` |
-| Direct device detail | `getDeviceDetails(id:)` | `GET /api/v1/devices/{id}` |
-| Device profiles subresource | `getDeviceDetails(id:)` | `GET /api/v1/devices/{id}/profiles` |
-| Device installed apps subresource | `getDeviceDetails(id:)` | `GET /api/v1/devices/{id}/installed_apps` |
-| Device users subresource | `getDeviceDetails(id:)` | `GET /api/v1/devices/{id}/users` |
-| Device logs by serial | device-detail log load path in service | `GET /api/v1/logs?serial_number={serial}` |
-| Individual log detail | log-detail load path in service | `GET /api/v1/logs/{id}` |
-| Device groups catalog | deferred/primary resource load | `GET /api/v1/device_groups` |
-| Assignment groups catalog | deferred/primary resource load | `GET /api/v1/assignment_groups` |
-| Profiles catalog | deferred resource load | `GET /api/v1/profiles` |
-| Custom configuration profiles catalog | deferred resource load | `GET /api/v1/custom_configuration_profiles` |
-| Apps catalog | deferred resource load | `GET /api/v1/apps?include_shared=true` |
-| Custom attributes catalog | deferred resource load | `GET /api/v1/custom_attributes` |
-| Custom declarations catalog | deferred resource load | `GET /api/v1/custom_declarations` |
-| Scripts catalog | deferred resource load | `GET /api/v1/scripts` |
-| Enrollments catalog | deferred resource load | `GET /api/v1/enrollments` |
-| DEP servers catalog | deferred resource load | `GET /api/v1/dep_servers` |
-| Script jobs catalog | deferred resource load | `GET /api/v1/script_jobs` |
-| Push certificate summary | deferred/primary resource load | `GET /api/v1/push_certificate` |
+| Feature | Upstream route |
+|---|---|
+| Initial/default device fleet load | `GET /api/v1/devices` |
+| Direct device detail | `GET /api/v1/devices/{id}` |
+| Device profiles subresource | `GET /api/v1/devices/{id}/profiles` |
+| Device installed apps subresource | `GET /api/v1/devices/{id}/installed_apps` |
+| Device users subresource | `GET /api/v1/devices/{id}/users` |
+| Device logs by serial | `GET /api/v1/logs?serial_number={serial}` |
+| Individual log detail | `GET /api/v1/logs/{id}` |
+| Device groups catalog | `GET /api/v1/device_groups` |
+| Assignment groups catalog | `GET /api/v1/assignment_groups` |
+| Profiles catalog | `GET /api/v1/profiles` |
+| Custom configuration profiles catalog | `GET /api/v1/custom_configuration_profiles` |
+| Apps catalog | `GET /api/v1/apps?include_shared=true` |
+| Custom attributes catalog | `GET /api/v1/custom_attributes` |
+| Custom declarations catalog | `GET /api/v1/custom_declarations` |
+| Scripts catalog | `GET /api/v1/scripts` |
+| Enrollments catalog | `GET /api/v1/enrollments` |
+| DEP servers catalog | `GET /api/v1/dep_servers` |
+| Script jobs catalog | `GET /api/v1/script_jobs` |
+| Push certificate summary | `GET /api/v1/push_certificate` |
 
 ### Direct Mutation Wiring
 
-| Feature | Service method | Upstream route |
-|---|---|---|
-| Download custom declaration | `downloadCustomDeclaration(id:)` | `GET /api/v1/custom_declarations/{id}/download` |
-| Create custom declaration | `createCustomDeclaration(input:)` | `POST /api/v1/custom_declarations` |
-| Update custom declaration | `updateCustomDeclaration(id:input:)` | `PATCH /api/v1/custom_declarations/{id}` |
-| Delete custom declaration | `deleteCustomDeclaration(id:)` | `DELETE /api/v1/custom_declarations/{id}` |
-| Create device | `createDevice(input:)` | `POST /api/v1/devices` |
-| Update device | `updateDevice(id:input:)` | `PATCH /api/v1/devices/{id}` |
-| Set device assignment-group membership | `setAssignmentGroupMembership(...)` | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/devices/{deviceID}` |
-| Delete device user | `deleteDeviceUser(deviceID:userID:)` | `DELETE /api/v1/devices/{deviceID}/users/{userID}` |
-| Create assignment group | `createAssignmentGroup(...)` | `POST /api/v1/assignment_groups` |
-| Update assignment group | `updateAssignmentGroup(...)` | `PATCH /api/v1/assignment_groups/{id}` |
-| Delete assignment group | `deleteAssignmentGroup(id:)` | `DELETE /api/v1/assignment_groups/{id}` |
-| Set assignment-group app link | `setAssignmentGroupAppLink(...)` | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/apps/{appID}` |
-| Set assignment-group profile link | `setAssignmentGroupProfileLink(...)` | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/profiles/{profileID}` |
-| Group action: push/update/sync/clone | group action path in service | `POST /api/v1/assignment_groups/{id}/{action}` |
-| Create catalog app | `createCatalogApp(input:)` | `POST /api/v1/apps` |
-| Update catalog app | `updateCatalogApp(id:input:)` | `PATCH /api/v1/apps/{id}` |
-| Delete catalog app | `deleteCatalogApp(id:)` | `DELETE /api/v1/apps/{id}` |
-| Create custom config profile | `createCustomConfigurationProfile(input:)` | `POST /api/v1/custom_configuration_profiles` |
-| Update custom config profile | `updateCustomConfigurationProfile(id:input:)` | `PATCH /api/v1/custom_configuration_profiles/{id}` |
-| Delete custom config profile | `deleteCustomConfigurationProfile(id:)` | `DELETE /api/v1/custom_configuration_profiles/{id}` |
-| Download custom config profile | `downloadCustomConfigurationProfile(id:)` | `GET /api/v1/custom_configuration_profiles/{id}/download` |
-| Send enrollment invitation | `sendEnrollmentInvitation(id:contact:)` | `POST /api/v1/enrollments/{id}/invitations` |
-| Delete enrollment | `deleteEnrollment(id:)` | `DELETE /api/v1/enrollments/{id}` |
-| Sync DEP server | `syncDEPServer(id:)` | `POST /api/v1/dep_servers/{id}/sync` |
-| Load DEP devices | `fetchDEPDevices(serverID:)` | `GET /api/v1/dep_servers/{serverID}/dep_devices` |
-| Load one DEP device | DEP detail helper | `GET /api/v1/dep_servers/{serverID}/dep_devices/{deviceID}` |
-| Download push CSR | push certificate helper | `GET /api/v1/push_certificate/scsr` |
-| Update push certificate | `updatePushCertificate(...)` | `PUT /api/v1/push_certificate` |
-| Load managed configs | managed config list helper | `GET /api/v1/apps/{appID}/managed_configs` |
-| Create managed config | `createManagedConfig(appID:input:)` | `POST /api/v1/apps/{appID}/managed_configs` |
-| Delete managed config | `deleteManagedConfig(appID:configID:)` | `DELETE /api/v1/apps/{appID}/managed_configs/{configID}` |
-| Push managed configs | managed config push helper | `POST /api/v1/apps/{appID}/managed_configs/push` |
-| Load one script | script detail helper | `GET /api/v1/scripts/{id}` |
-| Create script | `createScript(input:)` | `POST /api/v1/scripts` |
-| Update script | `updateScript(id:input:)` | `PATCH /api/v1/scripts/{id}` |
-| Delete script | `deleteScript(id:)` | `DELETE /api/v1/scripts/{id}` |
-| Load one script job | script job detail helper | `GET /api/v1/script_jobs/{id}` |
-| Create script job | `createScriptJob(input:)` | `POST /api/v1/script_jobs` |
-| Cancel script job | `cancelScriptJob(id:)` | `DELETE /api/v1/script_jobs/{id}` |
-| Assign declaration to device | declaration-device link helper | `POST /api/v1/custom_declarations/{id}/devices/{deviceID}` |
-| Unassign declaration from device | declaration-device link helper | `DELETE /api/v1/custom_declarations/{id}/devices/{deviceID}` |
+| Feature | Upstream route |
+|---|---|
+| Download custom declaration | `GET /api/v1/custom_declarations/{id}/download` |
+| Create custom declaration | `POST /api/v1/custom_declarations` |
+| Update custom declaration | `PATCH /api/v1/custom_declarations/{id}` |
+| Delete custom declaration | `DELETE /api/v1/custom_declarations/{id}` |
+| Create device | `POST /api/v1/devices` |
+| Update device | `PATCH /api/v1/devices/{id}` |
+| Set device assignment-group membership | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/devices/{deviceID}` |
+| Delete device user | `DELETE /api/v1/devices/{deviceID}/users/{userID}` |
+| Create assignment group | `POST /api/v1/assignment_groups` |
+| Update assignment group | `PATCH /api/v1/assignment_groups/{id}` |
+| Delete assignment group | `DELETE /api/v1/assignment_groups/{id}` |
+| Set assignment-group app link | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/apps/{appID}` |
+| Set assignment-group profile link | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/profiles/{profileID}` |
+| Group action: push/update/sync/clone | `POST /api/v1/assignment_groups/{id}/{action}` |
+| Create catalog app | `POST /api/v1/apps` |
+| Update catalog app | `PATCH /api/v1/apps/{id}` |
+| Delete catalog app | `DELETE /api/v1/apps/{id}` |
+| Create custom config profile | `POST /api/v1/custom_configuration_profiles` |
+| Update custom config profile | `PATCH /api/v1/custom_configuration_profiles/{id}` |
+| Delete custom config profile | `DELETE /api/v1/custom_configuration_profiles/{id}` |
+| Download custom config profile | `GET /api/v1/custom_configuration_profiles/{id}/download` |
+| Send enrollment invitation | `POST /api/v1/enrollments/{id}/invitations` |
+| Delete enrollment | `DELETE /api/v1/enrollments/{id}` |
+| Sync DEP server | `POST /api/v1/dep_servers/{id}/sync` |
+| Load DEP devices | `GET /api/v1/dep_servers/{serverID}/dep_devices` |
+| Load one DEP device | `GET /api/v1/dep_servers/{serverID}/dep_devices/{deviceID}` |
+| Download push CSR | `GET /api/v1/push_certificate/scsr` |
+| Update push certificate | `PUT /api/v1/push_certificate` |
+| Load managed configs | `GET /api/v1/apps/{appID}/managed_configs` |
+| Create managed config | `POST /api/v1/apps/{appID}/managed_configs` |
+| Delete managed config | `DELETE /api/v1/apps/{appID}/managed_configs/{configID}` |
+| Push managed configs | `POST /api/v1/apps/{appID}/managed_configs/push` |
+| Load one script | `GET /api/v1/scripts/{id}` |
+| Create script | `POST /api/v1/scripts` |
+| Update script | `PATCH /api/v1/scripts/{id}` |
+| Delete script | `DELETE /api/v1/scripts/{id}` |
+| Load one script job | `GET /api/v1/script_jobs/{id}` |
+| Create script job | `POST /api/v1/script_jobs` |
+| Cancel script job | `DELETE /api/v1/script_jobs/{id}` |
+| Assign declaration to device | `POST /api/v1/custom_declarations/{id}/devices/{deviceID}` |
+| Unassign declaration from device | `DELETE /api/v1/custom_declarations/{id}/devices/{deviceID}` |
 
 ### Device Action Wiring
 
-| Feature | Service method | Upstream route |
-|---|---|---|
-| Lock device | device action request builder | `POST /api/v1/devices/{id}/{lockActionName}` |
-| Wipe device | device action request builder | `POST /api/v1/devices/{id}/{wipeActionName}` |
-| Sync device | device action request builder | `POST /api/v1/devices/{id}/{syncActionName}` |
-| Clear passcode | installed device action path | `POST /api/v1/devices/{id}/clear_passcode` |
-| Restart | installed device action path | `POST /api/v1/devices/{id}/restart` |
-| Shutdown | installed device action path | `POST /api/v1/devices/{id}/shutdown` |
-| Request installed-app management | installed app action path | `POST /api/v1/installed_apps/{id}/request_management` |
-| Update installed app | installed app action path | `POST /api/v1/installed_apps/{id}/update` |
-| Uninstall installed app | installed app action path | `DELETE /api/v1/installed_apps/{id}` |
-| Enable lost mode | lost-mode action path | `POST /api/v1/devices/{id}/lost_mode` |
-| Disable lost mode | lost-mode action path | `DELETE /api/v1/devices/{id}/lost_mode` |
-| Play lost-mode sound | lost-mode action path | `POST /api/v1/devices/{id}/lost_mode/play_sound` |
-| Update lost-mode location | lost-mode action path | `POST /api/v1/devices/{id}/lost_mode/update_location` |
+| Feature | Upstream route |
+|---|---|
+| Lock device | `POST /api/v1/devices/{id}/{lockActionName}` |
+| Wipe device | `POST /api/v1/devices/{id}/{wipeActionName}` |
+| Sync device | `POST /api/v1/devices/{id}/{syncActionName}` |
+| Clear passcode | `POST /api/v1/devices/{id}/clear_passcode` |
+| Restart | `POST /api/v1/devices/{id}/restart` |
+| Shutdown | `POST /api/v1/devices/{id}/shutdown` |
+| Request installed-app management | `POST /api/v1/installed_apps/{id}/request_management` |
+| Update installed app | `POST /api/v1/installed_apps/{id}/update` |
+| Uninstall installed app | `DELETE /api/v1/installed_apps/{id}` |
+| Enable lost mode | `POST /api/v1/devices/{id}/lost_mode` |
+| Disable lost mode | `DELETE /api/v1/devices/{id}/lost_mode` |
+| Play lost-mode sound | `POST /api/v1/devices/{id}/lost_mode/play_sound` |
+| Update lost-mode location | `POST /api/v1/devices/{id}/lost_mode/update_location` |
 
 ### MunkiReport Enrichment Wiring
 
-| Feature | Service method | Module route |
-|---|---|---|
-| Sync telemetry | module dashboard load path | `{base}/{prefix}/inventory/data/sync_health` |
-| Compliance summary | module dashboard load path | `{base}/{prefix}/simplemdm/data/compliance_stats` |
-| Command status summary | module dashboard load path | `{base}/{prefix}/simplemdm/data/command_status_stats` |
-| Assignment-group stats | module dashboard load path | `{base}/{prefix}/simplemdm/data/assignment_group_stats` |
-| Resource-type stats | module dashboard load path | `{base}/{prefix}/simplemdm/data/resource_type_stats` |
-| OS-security stats | module dashboard load path | `{base}/{prefix}/simplemdm/data/os_security_stats` |
-| Supplemental status | module dashboard load path | `{base}/{prefix}/simplemdm/data/supplemental_status` |
-| Supplemental overview | module dashboard load path | `{base}/{prefix}/simplemdm/data/supplemental_overview` |
-| AppleCare stats | module dashboard load path | `{base}/{prefix}/simplemdm/data/apple_care_stats` |
-| Device connected resources | device connections load path | `{base}/{prefix}/get_device_resources/{serial}` |
+| Feature | Module route |
+|---|---|
+| Sync telemetry | `{base}/{prefix}/inventory/data/sync_health` |
+| Compliance summary | `{base}/{prefix}/simplemdm/data/compliance_stats` |
+| Command status summary | `{base}/{prefix}/simplemdm/data/command_status_stats` |
+| Assignment-group stats | `{base}/{prefix}/simplemdm/data/assignment_group_stats` |
+| Resource-type stats | `{base}/{prefix}/simplemdm/data/resource_type_stats` |
+| OS-security stats | `{base}/{prefix}/simplemdm/data/os_security_stats` |
+| Supplemental status | `{base}/{prefix}/simplemdm/data/supplemental_status` |
+| Supplemental overview | `{base}/{prefix}/simplemdm/data/supplemental_overview` |
+| AppleCare stats | `{base}/{prefix}/simplemdm/data/apple_care_stats` |
+| Device connected resources | `{base}/{prefix}/get_device_resources/{serial}` |
 
 ## Failure Modes And Fallback Behavior
 
@@ -1621,7 +1610,7 @@ This is the high-level runtime model for `ReportSimpleMDM`:
                         direct read/write requests
                                    |
 +--------------------+   +---------+----------+   +----------------------+
-| SwiftUI App        |<->| SimpleMDMService   |<->| MunkiReport          |
+| App UI             |<->| Service Layer      |<->| MunkiReport          |
 | Dashboard          |   | State + sync       |   | simplemdm module     |
 | Devices            |   | cache + enrichment |   | Optional enrichment  |
 | Admin              |   +---------+----------+   +----------------------+
@@ -1637,11 +1626,10 @@ This is the high-level runtime model for `ReportSimpleMDM`:
 
 Interpretation:
 
-- the SwiftUI app talks through `SimpleMDMService`
-- `SimpleMDMService` talks directly to SimpleMDM for primary operations
-- `SimpleMDMService` optionally talks to the MunkiReport module for enrichment
-- SwiftData stores cached operational state
-- Keychain stores secrets
+- the app talks directly to SimpleMDM for primary operations
+- the app optionally talks to the MunkiReport module for enrichment
+- local storage keeps cached operational state
+- the keychain stores secrets
 
 ## Troubleshooting Recipes
 
@@ -1767,95 +1755,9 @@ The app mode where direct SimpleMDM remains primary and MunkiReport module reads
 
 A hash-like identity derived from connection settings and, for some caches, the active query, used to prevent cache reuse across different tenants or modes.
 
-## Contributor Architecture Notes
-
-This section is for contributors who need to know which files own which responsibilities inside `ReportSimpleMDM`.
-
-### App Bootstrap And Global Environment
-
-- `ReportSimpleMDM/ReportSimpleMDMApp.swift`
-  - app entry point
-  - SwiftData container creation
-  - environment object wiring
-  - iOS background refresh registration
-- `ReportSimpleMDM/ContentView.swift`
-  - decides between setup flow and main app shell
-  - owns tab layout and initial service configuration trigger
-
-### Configuration And Persistence
-
-- `ReportSimpleMDM/Settings.swift`
-  - operator configuration model
-  - backend mode, module URL, action names, TTLs, widget visibility
-- `ReportSimpleMDM/KeychainStore.swift`
-  - keychain save/load helpers for sensitive values
-- `ReportSimpleMDM/PersistenceModels.swift`
-  - SwiftData models for device cache, snapshots, resources, smart groups, and sync logs
-
-### Core Service Layer
-
-- `ReportSimpleMDM/SimpleMDMService.swift`
-  - primary app data orchestrator
-  - direct SimpleMDM reads and writes
-  - module enrichment reads
-  - cache hydration and snapshot persistence
-  - refresh state, banners, and error handling
-  - per-device derived inventory state
-- `ReportSimpleMDM/SyncSessionTracker.swift`
-  - sync session accounting and request categorization
-
-### Main App Surfaces
-
-- `ReportSimpleMDM/DashboardView.swift`
-  - dashboard composition
-  - KPI, direct panels, and module-backed panels
-- `ReportSimpleMDM/DeviceListView.swift`
-  - device inventory, filters, smart groups, and navigation into device detail
-- `ReportSimpleMDM/Device/Detail/DeviceDetailView.swift`
-  - device overview, inventory, and actions shell
-- `ReportSimpleMDM/AdminCenterView.swift`
-  - admin launcher, value-tier grouping, and endpoint workflow entry points
-- `ReportSimpleMDM/Settings/MainSettingsView.swift`
-  - operator settings index, sync/freshness visibility, and navigation to configuration subsections
-- `ReportSimpleMDM/Settings/ServerSettingsView.swift`
-  - direct SimpleMDM and optional MunkiReport connection setup
-
-### Resource-Specific Management Screens
-
-- `ReportSimpleMDM/AppListView.swift`
-  - app catalog management
-- `ReportSimpleMDM/ProfileManagementView.swift`
-  - live profiles and custom configuration profiles
-- `ReportSimpleMDM/AssignmentGroupManagementView.swift`
-  - assignment-group CRUD and membership workflows
-- `ReportSimpleMDM/CustomDeclarationsView.swift`
-  - custom declaration management
-- `ReportSimpleMDM/LowerTierManagementViews.swift`
-  - enrollments, DEP servers, push certificates, managed app configs, scripts, and jobs
-- `ReportSimpleMDM/APIExplorerView.swift`
-  - generic API catalog and runnable endpoint UI
-
-### Styling And Supporting Models
-
-- `ReportSimpleMDM/Models.swift`
-  - decoded API and module payload models plus view-supporting data structures
-- `ReportSimpleMDM/Styles/*`
-  - shared visual styling primitives
-- `ReportSimpleMDM/AppNavigationState.swift`
-  - cross-screen navigation state for dashboard-to-device-list drill-ins
-
-### Tests
-
-- `ReportSimpleMDMTests/SettingsTests.swift`
-  - settings revision behavior
-- `ReportSimpleMDMTests/PersistenceModelsTests.swift`
-  - cache-key and snapshot persistence behavior
-- `ReportSimpleMDMTests/SyncSessionTrackerTests.swift`
-  - sync-request categorization and summary behavior
-
 ## Changelog And Release History
 
-The repo does not currently maintain a formal versioned changelog with tagged releases in this README. To avoid inventing history, this section summarizes the currently documented product-era milestones visible in the codebase.
+The repo does not currently maintain a formal versioned changelog with tagged releases in this README. To avoid inventing history, this section summarizes the currently documented product-era milestones reflected in the current app behavior.
 
 ### Current Documented Milestone Areas
 
@@ -1915,33 +1817,6 @@ If you want to confirm that `ReportSimpleMDM` is behaving correctly, these are t
 4. Confirm the app remains usable for read flows afterward.
 5. Confirm disabled actions describe the missing permission domain when that evidence has been learned.
 
-## Contributor Notes
-
-These notes are still about `ReportSimpleMDM`, but from a repo-maintainer perspective.
-
-### Current Test Coverage In Repo
-
-Automated test files currently cover:
-
-- settings revision behavior
-- persistence model behavior
-- sync-session tracking behavior
-
-### Validation Limits Seen In This Environment
-
-In this workspace session:
-
-- the `ReportSimpleMDM` scheme was not configured for the `test` action
-- a no-signing build attempt also hit environment-related Xcode/CoreSimulator and disk-I/O problems in the sandbox
-
-That means README accuracy was validated primarily by:
-
-- code inspection
-- route and state-path review
-- repository diff review
-
-Rather than by a clean end-to-end build or test pass in this environment.
-
 ## Important Operational Details
 
 ### Refresh Behavior
@@ -1998,34 +1873,6 @@ The app is already broad, but a few boundaries matter:
 - some settings screens are informational, not full administrative control planes
 - device live-detail fetches are limited for non-enrolled records because the upstream API has different behavior there
 - write capability depends on the API key actually granted by the SimpleMDM tenant
-
-## Tests In The Repository
-
-The current test target includes coverage for:
-
-- settings revision behavior
-- persistence model cache keys and snapshot round-tripping
-- sync-session tracking and request categorization
-
-Test files currently present:
-
-- `ReportSimpleMDMTests/SettingsTests.swift`
-- `ReportSimpleMDMTests/PersistenceModelsTests.swift`
-- `ReportSimpleMDMTests/SyncSessionTrackerTests.swift`
-
-## Build Notes
-
-Local development currently expects:
-
-- Xcode
-- a valid target/simulator selection
-- signing setup when building normally for devices
-
-For source-validity checks, the project can also be built without signing:
-
-```bash
-xcodebuild -project ReportSimpleMDM.xcodeproj -scheme ReportSimpleMDM -derivedDataPath BuildDerivedData CODE_SIGNING_ALLOWED=NO build
-```
 
 ## Bottom Line
 
