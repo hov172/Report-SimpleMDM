@@ -2,14 +2,44 @@
 
 ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS and iOS. Its primary purpose is to give admins a fast, operator-focused view of fleet state while also exposing a large amount of the SimpleMDM API surface through native workflows, an API catalog, and runnable endpoint presets.
 
-The app works in two modes:
+The app is designed first as a standalone SimpleMDM operations client. Optional MunkiReport enrichment is supported, but it is additive rather than foundational.
 
-- `SimpleMDM API Only`
-  - direct read and write access to SimpleMDM
-  - no MunkiReport dependency
-- `SimpleMDM + MunkiReport Module`
-  - SimpleMDM remains the system of record for devices and actions
-  - optional MunkiReport module data can enrich dashboards and device detail with supplemental context
+## Table Of Contents
+
+- [What The App Can Do Today](#what-the-app-can-do-today)
+- [Architecture](#architecture)
+- [Platform Support](#platform-support)
+- [Detailed Capability Breakdown](#detailed-capability-breakdown)
+- [Settings, Diagnostics, And Operator Controls](#settings-diagnostics-and-operator-controls)
+- [API Permission Model](#api-permission-model)
+- [Performance Characteristics](#performance-characteristics)
+- [How Data Flows Through The App](#how-data-flows-through-the-app)
+- [Startup, Sync, Cache, And Snapshot Lifecycle](#startup-sync-cache-and-snapshot-lifecycle)
+- [How MunkiReport Enrichment Is Merged](#how-munkireport-enrichment-is-merged)
+- [Quickstart](#quickstart)
+- [Deployment Examples](#deployment-examples)
+- [Feature To Data Source Mapping](#feature-to-data-source-mapping)
+- [Capability Matrix](#capability-matrix)
+- [Permission Matrix](#permission-matrix)
+- [Endpoint Appendix](#endpoint-appendix)
+- [Failure Modes And Fallback Behavior](#failure-modes-and-fallback-behavior)
+- [Known Limitations](#known-limitations)
+- [Known Bugs](#known-bugs)
+- [Security And Secrets](#security-and-secrets)
+- [Architecture Diagram](#architecture-diagram)
+- [Troubleshooting Recipes](#troubleshooting-recipes)
+- [Glossary](#glossary)
+- [Contributor Architecture Notes](#contributor-architecture-notes)
+- [Changelog And Release History](#changelog-and-release-history)
+- [Validation Checklist](#validation-checklist)
+- [Contributor Notes](#contributor-notes)
+- [Important Operational Details](#important-operational-details)
+- [Security And Storage](#security-and-storage)
+- [Current Boundaries And Caveats](#current-boundaries-and-caveats)
+- [Tests In The Repository](#tests-in-the-repository)
+- [Build Notes](#build-notes)
+- [Bottom Line](#bottom-line)
+- [Connect With Me](#connect-with-me)
 
 ## What The App Can Do Today
 
@@ -34,6 +64,15 @@ This is not just a dashboard demo. The app already contains real management surf
 ## Architecture
 
 ### Source Of Truth
+
+The app works in two modes:
+
+- `SimpleMDM API Only`
+  - direct read and write access to SimpleMDM
+  - no MunkiReport dependency
+- `SimpleMDM + MunkiReport Module`
+  - SimpleMDM remains the system of record for devices and actions
+  - optional MunkiReport module data can enrich dashboards and device detail with supplemental context
 
 SimpleMDM is the source of truth for:
 
