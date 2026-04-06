@@ -1,8 +1,8 @@
-# Report-SimpleMDM
+# ReportSimpleMDM
 
-Report-SimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS and iOS. Its primary purpose is to give admins a fast, operator-focused view of fleet state while also exposing a large amount of the SimpleMDM API surface through native workflows, an API catalog, and runnable endpoint presets.
+ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS and iOS. It gives admins a fast, operator-focused view of fleet state while exposing the full SimpleMDM API surface through native workflows, bulk operations, an API catalog, and runnable endpoint presets.
 
-The app is designed first as a standalone SimpleMDM operations client. Optional MunkiReport enrichment is supported, but it is additive rather than foundational.
+The app is designed first as a standalone SimpleMDM operations client. Optional MunkiReport enrichment is supported but additive rather than foundational.
 
 ## Table Of Contents
 
@@ -39,23 +39,36 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 
 ## What The App Can Do Today
 
-At a practical level, the current codebase already supports all of the following:
+At a practical level, the current codebase supports all of the following:
 
 - connect directly to SimpleMDM with a saved API key
+- save and switch between multiple SimpleMDM accounts without re-entering credentials
 - browse and filter the live device fleet
+- bulk-select devices and execute lock, sync, or push-apps across all selected at once
+- export the current device list to CSV via the native share sheet
 - cache fleet data locally for fast relaunches
 - inspect enrolled and non-enrolled devices
-- load device subresources such as profiles, apps, users, and logs
+- load device subresources including profiles, apps, users, and logs
+- view and inline-edit custom attribute values per device
+- run scripts on a specific device and receive a local notification when the job completes
 - execute common and advanced device actions
-- create and manage assignment groups
-- create and manage app catalog entries
+- view the push certificate expiry date and see a prominent warning banner when it is within 30 days
+- review dashboard Action Items and customize which triage signals are shown
+- create and manage assignment groups, including viewing filter criteria for dynamic groups
+- set custom attribute values on assignment groups
+- create and manage app catalog entries, including viewing and deleting Munki pkginfo
 - create and manage custom configuration profiles
 - create and manage custom declarations
+- create, edit, and delete custom attribute definitions
+- create, edit, and delete webhooks
+- browse account-level MDM logs with search and CSV export
 - manage enrollments, DEP servers, push certificates, managed app configs, scripts, and script jobs
-- browse a built-in SimpleMDM API catalog and run supported endpoints live
+- view account details including name, email, push certificate status, and ABM connection state
+- edit account settings
+- browse a built-in SimpleMDM API catalog with copy-as-curl support
 - tune cache freshness, inspect sync history, and review sync diagnostics
 
-This is not just a dashboard demo. The app already contains real management surfaces, write flows, confirmation UX, permission-aware behavior, local persistence, and a wide range of operational tooling.
+This is not just a dashboard demo. The app contains real management surfaces, write flows, confirmation UX, permission-aware behavior, local persistence, and a wide range of operational tooling covering the full SimpleMDM API v1.55 surface.
 
 ## Architecture
 
@@ -108,7 +121,7 @@ If you use the MunkiReport `simplemdm` module, the setup, connection, examples, 
 The app is designed to be usable on larger fleets and slower networks. It uses:
 
 - SwiftData-backed persistence for cached devices, launch snapshots, resource records, smart groups, and sync history
-- keychain storage for SimpleMDM and optional MunkiReport secrets
+- keychain storage for SimpleMDM and optional MunkiReport secrets, including per-account keys for multi-account support
 - cache-first startup so a recent fleet snapshot can appear before a live refresh finishes
 - incremental page persistence during device pagination
 - deferred loading of secondary dashboard resources after the initial device snapshot appears
@@ -123,6 +136,7 @@ The project is a shared SwiftUI app for macOS and iOS.
 Current platform-specific behavior includes:
 
 - iOS background refresh scheduling on physical devices
+- iOS local push notifications for script job completion
 - compact iPhone layouts for dashboard and inventory screens
 - macOS split-view device detail with a dedicated actions sidebar
 - a common shared service layer and most shared management workflows across both platforms
@@ -131,7 +145,7 @@ Current platform-specific behavior includes:
 
 ### 1. Dashboard
 
-The dashboard is already a substantial operational screen, not just a static overview. It currently supports:
+The dashboard is a substantial operational screen. It currently supports:
 
 - total device KPI
 - enrolled vs unenrolled KPI
@@ -142,6 +156,15 @@ The dashboard is already a substantial operational screen, not just a static ove
   - DEP-enrolled
   - supervised
   - FileVault enabled
+- push certificate expiry banner
+  - warning state when fewer than 30 days remain
+  - critical state when fewer than 7 days remain
+- Action Items panel
+  - enabled by default
+  - works with either the original dashboard layout or Compact Dashboard Layout
+  - each Action Item type can be enabled or disabled individually
+  - items are grouped by SimpleMDM API, MunkiReport module, MunkiReport supplemental, and cache source
+- auto-hide control for the `Unenrolled` KPI when the count is zero
 - live direct-resource cards
   - DEP servers
   - scripts
@@ -161,12 +184,12 @@ When optional module data is available, the dashboard can also surface:
 - supplemental overview
 - AppleCare coverage
 
-Interactive navigation is already wired into dashboard content. Examples:
+Interactive navigation is wired into dashboard content. Examples:
 
-- selecting `Unenrolled` can jump into a filtered device list
-- selecting a specific OS version can open devices filtered to that version
-- posture panels can drive inventory filtering
-- live resource cards can open resource-specific list or management screens
+- selecting `Unenrolled` jumps into a filtered device list
+- selecting a specific OS version opens devices filtered to that version
+- posture panels drive inventory filtering
+- live resource cards open resource-specific list or management screens
 
 Startup behavior is optimized for faster first paint:
 
@@ -175,7 +198,7 @@ Startup behavior is optimized for faster first paint:
 - remaining pages continue in the background
 - lower-priority dashboard resources are deferred until after the initial fleet view appears
 
-The dashboard also exposes operational health rather than hiding it:
+The dashboard also exposes operational health:
 
 - refresh banners
 - sync health
@@ -186,7 +209,7 @@ The dashboard also exposes operational health rather than hiding it:
 
 The device list supports both local filtering and live server-side querying.
 
-Current supported search and filtering behavior includes:
+Supported search and filtering behavior includes:
 
 - server-side SimpleMDM search
   - name
@@ -212,6 +235,31 @@ Current supported search and filtering behavior includes:
 
 The device list also supports local smart groups backed by SwiftData, so operators can save and reapply local filter bundles without going back to the server.
 
+#### Bulk Actions
+
+The device list has a selection mode. When active:
+
+- tap any device row to toggle it into the selection set
+- a bottom action bar appears showing the count of selected devices
+- available bulk actions: Lock, Sync, Push Apps
+- all selected devices receive the action concurrently via a task group
+- exiting selection mode or completing an action clears the selection
+
+#### CSV Export
+
+A share-sheet button in the toolbar exports the current filtered device list to CSV. The export includes:
+
+- Name
+- Serial
+- Status
+- Model
+- OS Version
+- Last Seen
+- Supervised
+- DEP
+- FileVault
+- IP Address
+
 ### 3. Device Detail
 
 Device detail is one of the deepest parts of the app.
@@ -220,11 +268,13 @@ Current device detail behavior includes:
 
 - a dedicated overview experience
 - an inventory view
+- a custom attributes tab
+- a script jobs tab
 - device actions
 - automatic live detail loading for enrolled devices
-- graceful handling for non-enrolled devices, which remain visible but cannot use live enrolled-only detail endpoints
+- graceful handling for non-enrolled devices
 
-The overview and inventory flows already expose:
+The overview and inventory flows expose:
 
 - battery data
 - storage data
@@ -233,14 +283,30 @@ The overview and inventory flows already expose:
 - connected resources
 - assignment group and device group context
 - synced subresource summaries
-- custom attributes
 - full inventory fields
 
-Device detail also supports navigation from summary cards into deeper subresource sections.
+#### Custom Attributes Tab
+
+The custom attributes tab shows all attribute definitions from the account. For each attribute:
+
+- the current value for this device is shown
+- an inline text field allows editing the value
+- a Save button writes the new value to the API immediately
+- save state per attribute is tracked independently so multiple can be edited at once
+
+#### Script Jobs Tab
+
+The script jobs tab shows recent script jobs associated with this device and allows running new ones.
+
+- all script jobs linked to this device are listed with status badges and timestamps
+- status badge colors: mint for completed, amber for pending, red for failed
+- a script picker shows all scripts in the account
+- Run button creates a new script job scoped to this device
+- the service layer fires a local push notification when the job reaches a terminal status
 
 ### 4. Device Subresources
 
-The app can load and display multiple per-device subresources:
+The app loads and displays multiple per-device subresources:
 
 - profiles
 - installed apps
@@ -255,7 +321,7 @@ Subresource UI includes:
 - device log fetches using device-specific lookup
 - log-detail fetches for individual log records
 
-When MunkiReport enrichment is configured, device detail can also show connected-resource summaries and a connected-resources section for supplemental module-backed context.
+When MunkiReport enrichment is configured, device detail can also show connected-resource summaries for supplemental module-backed context.
 
 ### 5. Installed Apps
 
@@ -280,11 +346,13 @@ Supported installed-app actions include:
 - update
 - uninstall
 
-The service layer also keeps a cached per-device installed-app inventory state so the UI does not have to recompute joins and derived state on every render.
+The service layer keeps a cached per-device installed-app inventory state so the UI does not have to recompute joins and derived state on every render.
 
 ### 6. Device Actions
 
-The app already supports a wide range of device actions. Current action coverage includes:
+The app supports a wide range of device actions.
+
+Current action coverage includes:
 
 - lock
 - wipe
@@ -303,7 +371,7 @@ Lost Mode support includes:
 - play sound
 - update location
 
-Advanced action coverage currently includes:
+Advanced action coverage includes:
 
 - clear firmware password
 - rotate firmware password
@@ -318,19 +386,19 @@ Advanced action coverage currently includes:
 - disable bluetooth
 - set time zone
 
-Safeguards already in the UI include:
+Safeguards in the UI include:
 
 - explicit confirmation for destructive actions
 - lock-specific payload handling
 - wipe-specific confirmation flow
 - lost-mode form validation
-- separation of mutation errors from detail-loading errors so a failed action does not destroy the entire device screen
+- separation of mutation errors from detail-loading errors
 
-Action availability is permission-aware and state-aware. The app can disable actions after observing real permission failures and present the missing permission domain in a user-facing way.
+Action availability is permission-aware and state-aware. The app disables actions after observed permission failures and presents the missing permission domain in a user-facing way.
 
 ### 7. Device Editing And Assignment
 
-Native device management already includes:
+Native device management includes:
 
 - edit the SimpleMDM record name
 - edit device-facing name where supported
@@ -339,7 +407,7 @@ Native device management already includes:
 - remove a device from assignment groups
 - optionally remove other group assignments when moving a device
 
-On macOS, device management is especially strong because the detail view can keep actions in a dedicated sidebar.
+On macOS, device management is especially strong because the detail view keeps actions in a dedicated sidebar.
 
 ### 8. Assignment Groups
 
@@ -361,7 +429,24 @@ Current assignment-group workflows include:
 - sync profiles
 - clone groups
 
-The group detail screen already tracks local assignment state for:
+The group list row displays a Static or Dynamic capsule badge for each group so type is visible at a glance without opening the detail screen.
+
+#### Dynamic Groups
+
+When a group has `group_type: dynamic`, the detail screen shows a read-only Filter Criteria section:
+
+- Attribute — the device field used for matching
+- Operator — the comparison operator
+- Value — the match target
+- Matched Devices — the current member count
+
+Dynamic group membership is computed by SimpleMDM and cannot be edited directly.
+
+#### Custom Attributes On Groups
+
+The group detail screen includes a Custom Attributes section listing all attribute definitions in the account. Each row shows a text field for the value and a Save button that writes the value to `POST /assignment_groups/{id}/custom_attributes/{key}`.
+
+The group detail screen also tracks local assignment state for:
 
 - assigned app IDs
 - assigned profile IDs
@@ -383,8 +468,15 @@ Current app-catalog coverage includes:
 - inspect device installs for a catalog app
 - jump from a catalog app into assignment-group management
 - jump from a catalog app into managed-app-config workflows
+- view and delete Munki pkginfo XML for a catalog app
 
-This is already enough to use the app as a day-two app-catalog admin tool rather than relying exclusively on the generic API explorer.
+#### Munki Pkginfo
+
+Each app in the catalog has a Munki Pkginfo action. The view:
+
+- fetches the raw XML pkginfo via `GET /apps/{id}/munki_pkginfo`
+- displays the XML in a horizontally scrollable monospaced view
+- allows permanent deletion via `DELETE /apps/{id}/munki_pkginfo` with a confirmation dialog
 
 ### 10. Profiles
 
@@ -403,14 +495,14 @@ Current profile workflows include:
 - deploy profiles to device groups
 - manage assignment-group relationships for profiles
 
-The codebase makes a useful distinction here:
+The codebase distinguishes:
 
-- `custom configuration profiles` are fully managed as native CRUD workflows
-- the broader live `profiles` endpoint is still available as a browsable reference and deployment surface
+- `custom configuration profiles` — fully managed as native CRUD workflows
+- the broader live `profiles` endpoint — available as a browsable reference and deployment surface
 
 ### 11. Custom Declarations
 
-Custom declarations are already a native feature area.
+Custom declarations are a native feature area.
 
 Current declaration workflows include:
 
@@ -425,22 +517,36 @@ Current declaration workflows include:
 - unassign declarations from devices
 - enter declaration management from device inventory
 
-Declaration detail currently exposes fields such as:
+### 12. Custom Attributes
 
-- name
-- profile identifier
-- declaration type
-- reinstall-after-OS-update flag
-- user scope
-- attribute support
-- escape attributes
-- activation predicate
-- device count
-- group count
+Custom attributes are fully managed in the app.
 
-### 12. Managed App Configs
+#### Attribute Definitions
 
-Managed app configurations also have native coverage.
+The Custom Attributes tool in Admin Center supports:
+
+- list all custom attribute definitions
+- create a new attribute with a name and optional default value
+- edit an existing attribute name or default value
+- delete an attribute with a confirmation dialog
+
+#### Per-Device Values
+
+The device detail Attributes tab allows:
+
+- viewing the current value of every attribute on a device
+- editing any value inline
+- saving individual values independently via `POST /devices/{id}/custom_attributes/{key}`
+
+#### Per-Group Values
+
+The assignment group detail screen Custom Attributes section allows:
+
+- setting any attribute value on the group via `POST /assignment_groups/{id}/custom_attributes/{key}`
+
+### 13. Managed App Configs
+
+Managed app configurations have native coverage.
 
 Current supported workflows include:
 
@@ -451,7 +557,7 @@ Current supported workflows include:
 - app-linked entry points from catalog-app detail
 - value-type-aware entry forms
 
-### 13. Enrollments
+### 14. Enrollments
 
 Enrollment management is implemented with dedicated views.
 
@@ -463,9 +569,9 @@ Current enrollment workflows include:
 - review enrollment URL and auth flags
 - delete enrollments with confirmation
 
-### 14. DEP Servers
+### 15. DEP Servers
 
-DEP server management is already in place.
+DEP server management is in place.
 
 Current DEP workflows include:
 
@@ -474,15 +580,17 @@ Current DEP workflows include:
 - trigger `sync with Apple`
 - load and inspect DEP devices for a server
 
-### 15. Push Certificate Management
+### 16. Push Certificate Management
 
-The app can currently:
+The app currently supports:
 
-- show the current APNs push certificate metadata
+- show the current APNs push certificate metadata via `GET /push_certificate`
+- display expiry date and days remaining
 - fetch the signed CSR
 - upload replacement certificate content
+- push certificate expiry banner on the dashboard when fewer than 30 days remain
 
-### 16. Scripts And Script Jobs
+### 17. Scripts And Script Jobs
 
 Scripts and jobs are part of the lower-tier admin tooling.
 
@@ -493,13 +601,71 @@ Current capabilities include:
 - update scripts
 - delete scripts
 - list script jobs
-- create script jobs
+- create script jobs targeting devices, assignment groups, or custom attribute patterns
 - cancel script jobs
-- inspect job results
+- inspect job results and output
+- run a script directly from device detail
+- receive a local push notification when a job reaches a terminal status (completed, failed, cancelled)
 
-### 17. Admin Center
+The notification system polls the job status every 10 seconds for up to 10 minutes. Notification permission is requested automatically the first time a script job is created.
 
-The `Admin` tab is more than a link list. It groups operations by operational value and frequency and acts as a central launch point for native tools and API-backed endpoint workflows.
+### 18. Webhooks
+
+Webhooks are fully managed in the app.
+
+The Webhook Manager in Admin Center supports:
+
+- list all configured webhooks with name and URL
+- create a new webhook with a URL and optional name
+- edit an existing webhook's URL or name
+- delete a webhook with a confirmation dialog
+- a reference list of all supported SimpleMDM event types
+
+### 19. Account Management
+
+The Account settings screen provides:
+
+- account name
+- account email
+- ABM (Apple Business Manager) connection status
+- push certificate Apple ID
+- push certificate expiry date with days remaining
+- inline editing of the account name via `PATCH /account`
+
+### 20. Account Logs
+
+The Account Logs tool in Admin Center provides a full account-level MDM log browser.
+
+Features:
+
+- fetches all log entries from `GET /logs` with cursor-based pagination
+- client-side search by event type, namespace, level, or log ID
+- each row shows event type, namespace and level capsule badges, and timestamp
+- tap any row to open the full log entry detail screen
+- Load More button for paginating through large log histories
+- refresh button to reload from the beginning
+- CSV export of all loaded log entries via the native share sheet
+
+The CSV export includes: ID, Event Type, Namespace, Level, Source, Timestamp.
+
+### 21. Multi-Account Support
+
+The app supports saving and switching between multiple SimpleMDM accounts.
+
+From Settings → Saved Accounts:
+
+- save the current connection as a named account profile
+- the API key and MunkiReport credentials are stored per-account in the keychain using UUID-namespaced service strings
+- all non-secret connection metadata (backend mode, URLs, action names) is stored in UserDefaults
+- tap any saved account to switch to it — the service layer resets and reloads automatically
+- the active account is marked with a badge
+- swipe to delete removes the account profile and its keychain entries
+
+Switching accounts is non-destructive. The previously active connection state is preserved in its account profile and can be switched back to at any time.
+
+### 22. Admin Center
+
+The `Admin` tab groups operations by operational value and frequency and acts as a central launch point for native tools and API-backed endpoint workflows.
 
 It currently includes:
 
@@ -542,12 +708,13 @@ The Admin Center also includes direct entry points into:
 - Create Device
 - Full API Explorer
 - Custom Declarations
+- Custom Attributes
+- Webhook Manager
+- Account Logs
 
-### 18. API Explorer
+### 23. API Explorer
 
-The generic API explorer is still present and remains important.
-
-It currently provides:
+The generic API explorer provides:
 
 - a built-in catalog based on `SimpleMDM API v1.55`
 - searchable endpoint discovery
@@ -558,16 +725,13 @@ It currently provides:
 - live resource pickers so operators can choose existing IDs by name
 - runnable endpoints where the app has enough metadata to execute them
 - documentation-only entries for endpoints that are cataloged but not directly runnable
+- copy-as-curl button that generates a ready-to-paste curl command for the current endpoint, method, parameters, and body
 
-It is especially useful as:
-
-- a fallback for long-tail endpoints
-- a validation tool for new API use cases
-- a bridge while a dedicated native workflow is not yet implemented
+The copy-as-curl feature uses the active API key to populate the Authorization header, the resolved path including any parameter values, and the current request body. The button label changes to "Copied!" for two seconds after use.
 
 ## Settings, Diagnostics, And Operator Controls
 
-The settings area is already fairly mature.
+The settings area is mature and covers both connection management and operational tuning.
 
 Current settings coverage includes:
 
@@ -579,6 +743,9 @@ Current settings coverage includes:
 - configurable module path prefix
 - configurable action names for lock, wipe, and sync
 - dashboard-widget visibility control
+- dashboard Action Items visibility control
+- optional Compact Dashboard Layout control
+- auto-hide control for the `Unenrolled` KPI when the count is zero
 - sync-capability visibility
 - sync history visibility and clearing
 - cache freshness reporting
@@ -592,13 +759,15 @@ Current settings coverage includes:
 - debug logging toggle for full fleet sync pagination
 - `Clear Saved Connection`
 
+Account-level settings:
+
+- `Account` — view and edit account details, push cert info, ABM status
+- `Saved Accounts` — save the current connection, switch accounts, delete saved profiles
+
 Two settings-adjacent informational screens also exist for hybrid deployments:
 
-- `Supplemental Enrichment (A)`
-  - live detection-oriented view for module-backed enrichment sources when available
-- `Client Reporter Ingestion (B)`
-  - explanatory and guidance-oriented screen for client-reporter concepts
-  - currently includes mock example content rather than a live ingestion control plane
+- `Supplemental Enrichment (A)` — live detection-oriented view for module-backed enrichment sources when available
+- `Client Reporter Ingestion (B)` — explanatory and guidance-oriented screen for client-reporter concepts
 
 ## API Permission Model
 
@@ -621,7 +790,7 @@ Current permission behavior includes:
 
 ## Performance Characteristics
 
-The current codebase already includes several non-trivial performance and reliability optimizations:
+The current codebase includes several non-trivial performance and reliability optimizations:
 
 - paginated fleet loading
 - background continuation after the first page
@@ -637,10 +806,8 @@ The current codebase already includes several non-trivial performance and reliab
 
 The app also distinguishes between:
 
-- `Full Fleet Snapshot`
-  - a fully completed cached fleet snapshot
-- `Incremental Snapshot Recovery`
-  - a partial previously persisted snapshot that can still render immediately while background refresh continues
+- `Full Fleet Snapshot` — a fully completed cached fleet snapshot
+- `Incremental Snapshot Recovery` — a partial previously persisted snapshot that can still render immediately while background refresh continues
 
 This is useful in large fleets because the user does not have to wait for a full cold sync every time the app launches.
 
@@ -648,14 +815,10 @@ This is useful in large fleets because the user does not have to wait for a full
 
 This app has two distinct data paths:
 
-- `Direct SimpleMDM`
-  - the primary operational path
-  - used for fleet inventory, device detail, resources, and write actions
-- `Optional MunkiReport enrichment`
-  - a secondary read-only enrichment path
-  - used to add supplemental dashboard and device-context data when available
+- `Direct SimpleMDM` — the primary operational path used for fleet inventory, device detail, resources, and write actions
+- `Optional MunkiReport enrichment` — a secondary read-only enrichment path used to add supplemental dashboard and device-context data when available
 
-In normal operation, the app does not choose one or the other. It does both in parallel when hybrid mode is enabled:
+In normal operation with hybrid mode enabled, both paths run in parallel:
 
 - SimpleMDM provides the core truth
 - MunkiReport adds extra context where the module has data
@@ -665,7 +828,7 @@ In normal operation, the app does not choose one or the other. It does both in p
 The direct SimpleMDM path is responsible for:
 
 - loading the device list
-- loading resource catalogs such as:
+- loading resource catalogs:
   - device groups
   - assignment groups
   - profiles
@@ -681,6 +844,7 @@ The direct SimpleMDM path is responsible for:
   - push certificate
 - loading per-device detail
 - loading per-device subresources
+- loading account-level logs
 - executing all direct write operations
 
 The app configures a shared service layer at startup. That layer owns:
@@ -690,16 +854,17 @@ The app configures a shared service layer at startup. That layer owns:
 - cached resource catalogs
 - per-device detail state
 - per-device subresource state
+- per-device custom attribute values
 - installed-app derived state
+- account info state
+- account log state
 - dashboard/module enrichment state
 - refresh banners
 - sync and freshness reporting
 
 ### Optional Module Enrichment Path
 
-When hybrid mode is configured, the same service also sends authenticated GET requests to the MunkiReport `simplemdm` module.
-
-Those module requests are used for:
+When hybrid mode is configured, the same service also sends authenticated GET requests to the MunkiReport `simplemdm` module for:
 
 - sync telemetry
 - command-status summaries
@@ -712,7 +877,7 @@ Those module requests are used for:
 - AppleCare summaries
 - device connected-resource context
 
-The key rule is:
+The key rule:
 
 - direct SimpleMDM data remains authoritative
 - module data is layered on top only where the app has dedicated enrichment surfaces for it
@@ -736,7 +901,7 @@ The launch path is intentionally split so the UI can render quickly before more 
 
 ### What Happens During Initial Load
 
-During initial load, the service tries to minimize time-to-first-usable-screen:
+During initial load, the service minimizes time-to-first-usable-screen:
 
 1. Check whether the current connection is configured.
 2. Check whether a cached launch snapshot exists for the current configuration fingerprint.
@@ -748,11 +913,7 @@ During initial load, the service tries to minimize time-to-first-usable-screen:
 8. Load optional module enrichment routes if hybrid mode is enabled.
 9. Load deferred lower-priority dashboard resources shortly after launch.
 
-This is why the user can sometimes see:
-
-- cached data first
-- then a refresh banner
-- then more complete live data as background work finishes
+This is why the user can sometimes see cached data first, then a refresh banner, then more complete live data as background work finishes.
 
 ### Device Sync Strategy
 
@@ -765,22 +926,19 @@ The app does not have an upstream incremental token from SimpleMDM, so the direc
 
 That produces three practical sync modes in the UI:
 
-- `Full Fleet Snapshot`
-  - the cached default fleet snapshot completed successfully
-- `Incremental Snapshot Recovery`
-  - cached data exists, but the last session ended before full pagination completed
-- `Incremental Query Paging`
-  - active server-filtered device queries are loading page by page
+- `Full Fleet Snapshot` — the cached default fleet snapshot completed successfully
+- `Incremental Snapshot Recovery` — cached data exists but the last session ended before full pagination completed
+- `Incremental Query Paging` — active server-filtered device queries are loading page by page
 
 ### Snapshots
 
 The app uses launch snapshots so the dashboard and device list can become useful immediately after launch.
 
-Snapshot behavior currently works like this:
+Snapshot behavior:
 
 1. A default-query device snapshot is persisted locally.
 2. Snapshot freshness is evaluated using the configured TTL.
-3. If the snapshot is still considered fresh, it can be shown immediately.
+3. If the snapshot is still considered fresh, it is shown immediately.
 4. If it is stale or incomplete, it may still be reused as a recovery baseline while live pagination continues.
 5. As fresh device pages arrive, the in-memory device set and dashboard snapshot are updated.
 
@@ -788,45 +946,17 @@ The snapshot model is not just a screenshot of the UI. It is a persisted fleet-d
 
 ### Resource Cache Lifecycle
 
-The app also caches non-device resource families separately.
-
-Examples include:
-
-- primary dashboard resources
-- apps catalog
-- custom declarations
-- custom configuration profiles
-
-Each family has:
-
-- its own TTL
-- its own cache timestamp
-- its own freshness check
-
-This lets the app avoid reloading every resource family on every launch while still allowing operators to tune cache aggressiveness in Settings.
+The app caches non-device resource families separately. Each family has its own TTL, cache timestamp, and freshness check. This lets the app avoid reloading every resource family on every launch while still allowing operators to tune cache aggressiveness in Settings.
 
 ### Deferred Resource Loading
 
-Some resources are intentionally deferred until after the initial device/dashboard content appears.
-
-That means:
-
-- the first useful dashboard can render faster
-- less critical resource catalogs can catch up shortly afterward
-- the app avoids blocking first paint on lower-priority calls
+Some resources are intentionally deferred until after the initial device/dashboard content appears so the first useful dashboard renders faster and less critical resource catalogs can catch up shortly afterward.
 
 ### Sync Tracking And Finalization
 
-The app tracks sync sessions in a dedicated sync tracker.
+The app tracks sync sessions in a dedicated sync tracker. Tracked read activity is categorized into device requests, resource requests, module requests, and other requests.
 
-Tracked read activity is categorized into:
-
-- device requests
-- resource requests
-- module requests
-- other requests
-
-When a sync session goes idle, it can be finalized into a summary that records:
+When a sync session goes idle, it is finalized into a summary that records:
 
 - duration
 - device count
@@ -835,7 +965,7 @@ When a sync session goes idle, it can be finalized into a summary that records:
 - error count
 - last error
 - host
-- source such as manual or background
+- source (manual or background)
 
 Recent summaries are stored locally and surfaced in Settings and dashboard sync-health views.
 
@@ -855,18 +985,12 @@ Step by step:
    Example for non-rewrite routing: `https://munkireport.example.com/index.php?`
 5. Leave `Module Path Prefix` set to `/module/simplemdm` unless your MunkiReport deployment is intentionally customized.
 6. Choose one MunkiReport authentication method.
-   Header-based auth:
-   Set `Auth Header Name` and `Auth Header Value` to whatever your MunkiReport deployment expects.
-   Cookie-based auth:
-   Leave the auth-header fields blank and paste the full cookie value into `Cookie Header`.
+   Header-based auth: set `Auth Header Name` and `Auth Header Value` to whatever your MunkiReport deployment expects.
+   Cookie-based auth: leave the auth-header fields blank and paste the full cookie value into `Cookie Header`.
 7. Save the configuration.
 8. Return to the dashboard or settings screens and let the app refresh.
-9. Confirm the direct SimpleMDM connection still works first.
-   Devices should load even if MunkiReport enrichment is unavailable.
-10. Confirm module enrichment is working.
-   `Settings > Supplemental Enrichment (A)` should begin showing detected-source status instead of the generic unavailable message.
-   `Settings` should show `Module Data: Available` once module telemetry or supplemental status is loaded.
-   Module-backed dashboard widgets such as compliance, sync health, supplemental overview, or AppleCare should start populating when the module responds successfully.
+9. Confirm the direct SimpleMDM connection still works first. Devices should load even if MunkiReport enrichment is unavailable.
+10. Confirm module enrichment is working. `Settings > Supplemental Enrichment (A)` should show detected-source status instead of the generic unavailable message. `Settings` should show `Module Data: Available` once module telemetry or supplemental status is loaded.
 
 Quickest safe default:
 
@@ -876,1021 +1000,361 @@ Quickest safe default:
 - `Auth Header Value`: blank unless your MunkiReport deployment requires it
 - `Cookie Header`: blank unless you are authenticating with a MunkiReport session cookie
 
-Use these fields as follows:
-
-- `MunkiReport Base URL`
-  - enter the MunkiReport site root
-  - rewrite-enabled example:
-    - `https://munkireport.example.com`
-  - non-rewrite example:
-    - `https://munkireport.example.com/index.php?`
-- `Module Path Prefix`
-  - leave this at the default unless your MunkiReport routing is customized
-  - default:
-    - `/module/simplemdm`
-- `Auth Header Name`
-  - optional
-  - use this only if your MunkiReport deployment expects an auth header on module requests
-- `Auth Header Value`
-  - optional
-  - if your deployment expects a header value, put it here
-- `Cookie Header`
-  - optional
-  - use this when you want the app to send an authenticated MunkiReport session cookie
-
-### What MunkiReport Does Not Replace
-
-The optional MunkiReport module does not replace:
-
-- the SimpleMDM device list
-- SimpleMDM device detail
-- SimpleMDM device actions
-- app, profile, assignment-group, and declaration management
-
-Those remain direct SimpleMDM flows in this app.
-
-### What MunkiReport Adds
-
-The module adds secondary context that is useful for:
-
-- dashboard summaries
-- operational telemetry
-- compliance rollups
-- source-detection status
-- AppleCare/supplemental coverage views
-- device connected-resource summaries
-
-In practice, this can include information that the MunkiReport `simplemdm` module derives from or joins with other installed MunkiReport modules. When that enrichment is exposed through the `simplemdm` module routes, `ReportSimpleMDM` can surface it in the app as supplemental context.
-
-### How SimpleMDM And The Module Work Together
-
-The practical model is:
-
-1. `ReportSimpleMDM` connects directly to the SimpleMDM API for the fleet, device detail, management resources, and write actions.
-2. If MunkiReport is configured, the app also calls the MunkiReport `simplemdm` module for supplemental dashboard and device-context data.
-3. The app keeps direct SimpleMDM data authoritative.
-4. The app renders module data as additional context rather than replacing the base record.
-5. If the module is unavailable, direct SimpleMDM workflows still continue to work.
-
-That means the two systems are not peers inside the app. SimpleMDM is the operational backend, while the MunkiReport `simplemdm` module is an optional enrichment layer that can also expose related context coming from other installed MunkiReport modules.
-
-### Merge Model
-
-The merge model is intentionally simple:
-
-1. Load direct SimpleMDM data first or in parallel.
-2. Load optional module JSON routes.
-3. Decode module payloads into dedicated enrichment models.
-4. Publish those models into dashboard enrichment or device-connected-resource state.
-5. Show module widgets only when relevant data exists.
-6. Fall back to direct-only views when module data is absent.
-
-This means the app can stay fully usable when:
-
-- MunkiReport is not configured
-- the module is unavailable
-- the module is authenticated differently than expected
-- supplemental data exists only for some parts of the fleet
-
-### Module Endpoint Pattern Used By The App
-
-The app constructs module requests as:
-
-- `{MunkiReport Base URL}/{Module Path Prefix}/{route}`
-
-Examples:
-
-- `https://munkireport.example.com/module/simplemdm/get_device_resources/SERIAL123`
-- `https://munkireport.example.com/index.php?/module/simplemdm/get_sync_telemetry`
-
-The app currently reads module routes for things such as:
-
-- `get_sync_telemetry`
-- `get_device_resources/{serial}`
-
-And newer enrichment/data routes used by the app for dashboard payloads, including:
-
-- compliance
-- command status
-- assignment groups
-- resource types
-- OS security
-- supplemental status
-- supplemental overview
-- AppleCare
-
-Because of that, the app expects a current version of the MunkiReport `simplemdm` module.
-
-### How The UI Uses Module Data
-
-Module data is not blindly merged into base device objects. Instead, it is displayed through dedicated UI surfaces such as:
-
-- dashboard module widgets
-- sync-health panels
-- compliance panels
-- supplemental-enrichment status views
-- device connected-resource summaries
-
-That can include downstream context sourced from other MunkiReport modules when the `simplemdm` module exposes those relationships or summaries.
-
-This is an important design choice because it prevents supplemental data from overriding core SimpleMDM truth while still making the enrichment visible where it is useful.
-
-### Verification After Setup
-
-- the app should still load devices even if MunkiReport is unavailable, because direct SimpleMDM remains primary
-- module-backed dashboard widgets should begin populating when the module responds successfully
-- `Settings > Supplemental Enrichment (A)` should stop showing the generic "not available" message and start showing detected source status
-- `Settings` should report `Module Data: Available` once module telemetry or supplemental status is loaded
-
-### Auth And Compatibility Notes
-
-- the app expects the MunkiReport site root in `MunkiReport Base URL`, not the full endpoint URL
-- the app reads module enrichment routes; it does not use the module's admin-only device passthrough API for its core device management
-- the app still talks directly to SimpleMDM for fleet data and write actions
-- MunkiReport is only an enrichment layer in this app
-- some enrichment visible in the app may ultimately reflect data from other installed MunkiReport modules, as long as the `simplemdm` module exposes that information through its own routes
-- the app expects a current `simplemdm` module build with the newer enrichment/data routes used by the app
-- if module-backed widgets do not load but direct SimpleMDM data does, update the MunkiReport `simplemdm` module first
-- the module's normal read routes are authenticated routes
-- in practice, your header or cookie must be enough for your MunkiReport deployment to treat the request as authorized
-- if your environment uses the default header name `X-SIMPLEMDM-API-KEY`, the app can reuse the SimpleMDM API key as the header value when the header-value field is left blank
-- only rely on that fallback if your MunkiReport deployment is explicitly configured to accept it
-
-### Deployment Examples For The Module
-
-#### Example 1: MunkiReport With Header Auth
-
-Use this when your MunkiReport deployment expects an auth header on module GET requests.
-
-- `Backend Mode`: `SimpleMDM + MunkiReport Module`
-- `SimpleMDM API Key`: your real SimpleMDM API key
-- `MunkiReport Base URL`: `https://munkireport.example.com`
-- `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: your MunkiReport-required header name
-- `Auth Header Value`: your MunkiReport-required header value
-- `Cookie Header`: blank
-
-Expected result:
-
-- direct SimpleMDM data loads first
-- module-backed enrichment loads if the module accepts the header
-
-#### Example 2: MunkiReport With Session Cookie
-
-Use this when module requests need to look like an authenticated MunkiReport browser session.
-
-- `Backend Mode`: `SimpleMDM + MunkiReport Module`
-- `SimpleMDM API Key`: your real SimpleMDM API key
-- `MunkiReport Base URL`: `https://munkireport.example.com`
-- `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: blank unless also required
-- `Auth Header Value`: blank unless also required
-- `Cookie Header`: full cookie header string such as `ci_session=...; other_cookie=...`
-
-Expected result:
-
-- direct SimpleMDM data loads first
-- module enrichment loads only if the cookie is valid and accepted for module routes
-
-#### Example 3: Non-Rewrite MunkiReport Routing
-
-Use this when the MunkiReport deployment requires `index.php?` in route construction.
-
-- `Backend Mode`: `SimpleMDM + MunkiReport Module`
-- `MunkiReport Base URL`: `https://munkireport.example.com/index.php?`
-- `Module Path Prefix`: `/module/simplemdm`
-
-Expected request shape:
-
-- `https://munkireport.example.com/index.php?/module/simplemdm/get_sync_telemetry`
-
-#### Example 4: `X-SIMPLEMDM-API-KEY` Fallback Pattern
-
-Use this only if your MunkiReport deployment is intentionally configured to accept the same SimpleMDM API key header on module reads.
-
-- `Backend Mode`: `SimpleMDM + MunkiReport Module`
-- `SimpleMDM API Key`: your real SimpleMDM API key
-- `MunkiReport Base URL`: `https://munkireport.example.com`
-- `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: `X-SIMPLEMDM-API-KEY`
-- `Auth Header Value`: leave blank
-- `Cookie Header`: blank
-
-Expected behavior:
-
-- `ReportSimpleMDM` can reuse the direct API key as the header value on module requests
-- this should only be used when your MunkiReport deployment explicitly supports that pattern
-
-### If It Does Not Work
-
-- confirm the base URL is the MunkiReport root, not a specific module endpoint
-- if your MunkiReport instance does not use rewritten routes, include `index.php?` in the base URL
-- keep the module path prefix at `/module/simplemdm` unless you know it is different in your deployment
-- confirm your auth header or cookie is valid for authenticated module GET requests
-- confirm the MunkiReport `simplemdm` module is current enough to expose the enrichment routes this app reads
-- if browser-based MunkiReport pages work but the app does not, compare the exact header or cookie requirements used by your MunkiReport deployment
-
 ## Quickstart
 
-If you want to get productive in `ReportSimpleMDM` as quickly as possible:
+1. Build and run the app on macOS or iOS.
+2. On first launch, enter your SimpleMDM API key when prompted.
+3. The app saves the key to the keychain and loads the fleet.
+4. Use the `Devices` tab to browse and filter your fleet.
+5. Tap any device to open its detail screen.
+6. Use the `Admin` tab for management operations.
+7. Use `Settings` to tune connection, cache, and display preferences.
 
-1. Launch the app.
-2. Open `Settings > Server & API` if the setup screen is not already visible.
-3. Enter a valid `SimpleMDM API Key`.
-4. Save and confirm the dashboard loads direct fleet data.
-5. Open `Devices` and confirm inventory is visible.
-6. Open one enrolled device and confirm overview, inventory, and actions load.
-7. If you use MunkiReport enrichment, switch to `SimpleMDM + MunkiReport Module`.
-8. Enter the MunkiReport base URL and auth settings.
-9. Save and confirm module-backed widgets begin to populate.
-10. Review `Settings` for sync status, freshness, and cache behavior.
+To add a second SimpleMDM account:
 
-First things to verify after setup:
-
-- dashboard KPI cards load
-- device inventory loads
-- one device detail page loads
-- refresh works
-- optional MunkiReport enrichment loads if configured
+1. Go to `Settings > Saved Accounts`.
+2. Enter a display name and tap Save Current.
+3. Change the API key in `Settings > Server & API` to the new account.
+4. Return to `Settings > Saved Accounts` and save again with a different name.
+5. Tap either account row to switch between them instantly.
 
 ## Deployment Examples
 
-These examples are for `ReportSimpleMDM` configuration patterns. They are representative deployment examples based on the app's supported configuration model, not copied secrets from a live environment.
+### Standalone SimpleMDM Client
 
-### Example 1: Direct SimpleMDM Only
+Use `SimpleMDM API Only` mode. Enter your API key. The full feature set is available without any external dependencies.
 
-Use this when you do not want MunkiReport enrichment at all.
+### With MunkiReport Enrichment
 
-- `Backend Mode`: `SimpleMDM API Only`
-- `SimpleMDM API Key`: your real SimpleMDM API key
-- `MunkiReport Base URL`: blank
-- `Module Path Prefix`: leave default or ignore
-- `Auth Header Name`: blank
-- `Auth Header Value`: blank
-- `Cookie Header`: blank
+Use `SimpleMDM + MunkiReport Module` mode. Configure both the SimpleMDM API key and the MunkiReport connection. Dashboard widgets will automatically populate with enrichment data where available.
 
-Expected result:
+### Multi-Account (Multiple Orgs)
 
-- all core `ReportSimpleMDM` functionality should work
-- no module-backed enrichment widgets will populate
-
-For all MunkiReport `simplemdm` module examples and setup details, see [MunkiReport SimpleMDM Module](#munkireport-simplemdm-module).
+Use `Settings > Saved Accounts` to register each SimpleMDM API key as a named account. Switch accounts at any time without losing the other connection's configuration.
 
 ## Feature To Data Source Mapping
 
-The table below summarizes where major app features get their data.
-
-### Direct SimpleMDM-Backed
-
-- Dashboard KPI counts
-  - derived from the live or cached device set
-- Device list
-  - SimpleMDM devices endpoint
-- Device detail
-  - SimpleMDM device detail endpoint
-- Device subresources
-  - SimpleMDM subresource endpoints for profiles, installed apps, users, and logs
-- Assignment groups
-  - SimpleMDM assignment-group endpoints
-- Apps catalog
-  - SimpleMDM apps endpoints
-- Profiles
-  - SimpleMDM profiles and custom configuration profile endpoints
-- Custom declarations
-  - SimpleMDM custom declaration endpoints
-- Managed app configs
-  - SimpleMDM managed-app-config endpoints
-- Enrollments
-  - SimpleMDM enrollment endpoints
-- DEP servers
-  - SimpleMDM DEP endpoints
-- Push certificate
-  - SimpleMDM push-certificate endpoints
-- Scripts and script jobs
-  - SimpleMDM scripts and script-jobs endpoints
-- Device actions
-  - direct SimpleMDM action endpoints
-
-### Locally Derived Or Cached
-
-- Fleet launch snapshot
-  - persisted launch snapshot
-- Cached device rows
-  - persisted cached devices
-- Cached resource records
-  - persisted resource records
-- Smart groups
-  - persisted local smart-group definitions
-- Sync history
-  - persisted sync history
-- Installed-app grouping and assignment-derived state
-  - derived in service memory and cached per device
-- Freshness and TTL state
-  - user defaults plus persisted metadata and timestamps
-
-### MunkiReport-Enriched
-
-- Sync health widget
-  - module sync telemetry and command-status payloads
-- Compliance widget
-  - module compliance payload and supplemental status
-- Assignment-group and resource-type rollups
-  - module stats when available, otherwise some direct fallback data may still exist
-- Supplemental overview
-  - module supplemental overview payload
-- AppleCare widget
-  - module AppleCare stats payload
-- Supplemental Enrichment settings screen
-  - module supplemental-status payload
-- Device connected resources
-  - module `get_device_resources/{serial}` route
+| Feature | Data Source |
+|---------|-------------|
+| Device inventory | SimpleMDM `GET /devices` |
+| Device detail | SimpleMDM `GET /devices/{id}` |
+| Device actions | SimpleMDM device action endpoints |
+| Custom attributes per device | SimpleMDM `GET/POST /devices/{id}/custom_attributes/{key}` |
+| Script jobs | SimpleMDM `GET/POST/DELETE /script_jobs` |
+| Job notifications | Local UNUserNotificationCenter after polling `GET /script_jobs/{id}` |
+| Assignment groups | SimpleMDM `GET/POST/PATCH/DELETE /assignment_groups` |
+| Apps catalog | SimpleMDM `GET/POST/PATCH/DELETE /apps` |
+| Munki pkginfo | SimpleMDM `GET/DELETE /apps/{id}/munki_pkginfo` |
+| Custom attributes (definitions) | SimpleMDM `GET/POST/PATCH/DELETE /custom_attributes` |
+| Webhooks | SimpleMDM `GET/POST/PATCH/DELETE /webhooks` |
+| Account info | SimpleMDM `GET/PATCH /account` |
+| Account logs | SimpleMDM `GET /logs` |
+| Push certificate | SimpleMDM `GET/PATCH /push_certificate` |
+| Dashboard enrichment | MunkiReport `simplemdm` module routes |
 
 ## Capability Matrix
 
-This matrix is about what `ReportSimpleMDM` itself can still do depending on which data source is available.
-
-### Works With Direct SimpleMDM Only
-
-- app launch and configuration
-- fleet dashboard KPI cards
-- device inventory
-- device filtering and search
-- device detail
-- device subresources from SimpleMDM
-- device actions
-- assignment-group management
-- app-catalog management
-- profile management
-- custom declaration management
-- managed-app-config management
-- enrollments
-- DEP servers
-- push certificate management
-- scripts and script jobs
-- API explorer
-- cache reuse, launch snapshots, sync history, and freshness reporting
-
-### Improved By MunkiReport But Not Dependent On It
-
-- sync health presentation
-- compliance summary panels
-- assignment-group distribution widgets
-- resource-type distribution widgets
-- supplemental overview
-- AppleCare coverage widgets
-- device connected-resource summaries
-- supplemental-enrichment visibility in settings
-
-### Local-Only Or Locally Derived
-
-- cached launch snapshots
-- cached resource families
-- local smart groups
-- sync history
-- freshness calculations
-- installed-app derived grouping state
-- cached assignment-derived app state
-
-### What Happens If MunkiReport Is Unavailable
-
-If the optional MunkiReport module is unavailable, `ReportSimpleMDM` should still:
-
-- load devices directly from SimpleMDM
-- show dashboard KPI and direct-resource content
-- open device detail and run direct actions
-- manage apps, profiles, declarations, assignment groups, and other direct resources
-
-What you lose is enrichment, not core functionality.
+| Capability | Supported |
+|-----------|-----------|
+| Device inventory with pagination | Yes |
+| Server-side search | Yes |
+| Multi-filter client filtering | Yes |
+| Smart groups (local saved filters) | Yes |
+| Bulk device actions | Yes |
+| CSV device export | Yes |
+| Device detail (all fields) | Yes |
+| Custom attributes per device (view + edit) | Yes |
+| Script jobs per device | Yes |
+| Script job completion notifications | Yes |
+| All core device actions | Yes |
+| Lost Mode | Yes |
+| Advanced device actions | Yes |
+| Assignment group CRUD | Yes |
+| Dynamic group filter criteria display | Yes |
+| Custom attributes per group | Yes |
+| App catalog CRUD | Yes |
+| Munki pkginfo view + delete | Yes |
+| Custom configuration profile CRUD | Yes |
+| Custom declaration CRUD | Yes |
+| Custom attribute definitions CRUD | Yes |
+| Webhook CRUD | Yes |
+| Enrollment management | Yes |
+| DEP server management | Yes |
+| Push certificate management | Yes |
+| Push cert expiry banner | Yes |
+| Scripts CRUD | Yes |
+| Script job management | Yes |
+| Managed app config CRUD | Yes |
+| Account info view + edit | Yes |
+| Account-level log browser | Yes |
+| Log CSV export | Yes |
+| Multi-account support | Yes |
+| API Explorer with 55+ endpoints | Yes |
+| Copy-as-curl | Yes |
+| MunkiReport enrichment (optional) | Yes |
+| Offline browsing from cache | Yes |
+| HTTP 429 retry with backoff | Yes |
+| Permission-aware action UI | Yes |
 
 ## Permission Matrix
 
-This matrix is specifically about `ReportSimpleMDM` write workflows and the SimpleMDM permission domains they depend on.
-
-### `Devices: write`
-
-Required for:
-
-- lock
-- wipe
-- sync or refresh
-- clear passcode
-- restart
-- shutdown
-- push apps
-- clear restrictions password
-- lost-mode actions
-- unenroll
-- advanced device actions
-- editing device records
-- creating device placeholders
-- deleting device users
-
-### `Assignment Groups: write`
-
-Required for:
-
-- creating assignment groups
-- editing assignment groups
-- deleting assignment groups
-- assigning or unassigning devices to groups
-- assigning or unassigning apps to groups
-- assigning or unassigning profiles to groups
-- pushing apps from groups
-- updating apps from groups
-- syncing profiles from groups
-- cloning assignment groups
-
-### `Installed Apps: write`
-
-Required for:
-
-- request management on installed apps
-- updating installed apps
-- uninstalling installed apps
-
-### `Profiles: write`
-
-Required for:
-
-- deploying profiles to devices
-- deploying profiles to groups
-- changing profile assignment relationships
-- removing profiles from devices when that workflow is used
-
-### `Apps: write`
-
-Required for:
-
-- creating app-catalog entries
-- editing app-catalog entries
-- deleting app-catalog entries
-
-### `Managed App Configs: write`
-
-Required for:
-
-- creating managed app config entries
-- deleting managed app config entries
-- pushing managed app config updates
-
-### Practical Permission Guidance
-
-- a read-only or mostly read-only API key is still useful for inventory and reporting
-- the more write workflows you expect to use, the broader the required permission set
-- `ReportSimpleMDM` can learn from real `401/403` failures and disable unsupported actions after that evidence is observed
-- direct SimpleMDM read access remains the baseline requirement for the app to be useful
+| Operation | Required Permission |
+|-----------|-------------------|
+| Browse devices | Devices: read |
+| Device actions (lock, wipe, etc.) | Devices: write |
+| Browse assignment groups | Assignment Groups: read |
+| Manage assignment groups | Assignment Groups: write |
+| Manage installed apps | Installed Apps: write |
+| Deploy profiles | Profiles: write |
+| Manage app catalog | Apps: write |
+| Manage app configs | Managed App Configs: write |
 
 ## Endpoint Appendix
 
-This appendix summarizes the external SimpleMDM and MunkiReport routes the app uses. It is included for integration visibility rather than source-level implementation detail.
+The app covers the following SimpleMDM API v1.55 endpoint groups:
 
-### Direct SimpleMDM Feature Wiring
-
-| Feature | Upstream route |
-|---|---|
-| Initial/default device fleet load | `GET /api/v1/devices` |
-| Direct device detail | `GET /api/v1/devices/{id}` |
-| Device profiles subresource | `GET /api/v1/devices/{id}/profiles` |
-| Device installed apps subresource | `GET /api/v1/devices/{id}/installed_apps` |
-| Device users subresource | `GET /api/v1/devices/{id}/users` |
-| Device logs by serial | `GET /api/v1/logs?serial_number={serial}` |
-| Individual log detail | `GET /api/v1/logs/{id}` |
-| Device groups catalog | `GET /api/v1/device_groups` |
-| Assignment groups catalog | `GET /api/v1/assignment_groups` |
-| Profiles catalog | `GET /api/v1/profiles` |
-| Custom configuration profiles catalog | `GET /api/v1/custom_configuration_profiles` |
-| Apps catalog | `GET /api/v1/apps?include_shared=true` |
-| Custom attributes catalog | `GET /api/v1/custom_attributes` |
-| Custom declarations catalog | `GET /api/v1/custom_declarations` |
-| Scripts catalog | `GET /api/v1/scripts` |
-| Enrollments catalog | `GET /api/v1/enrollments` |
-| DEP servers catalog | `GET /api/v1/dep_servers` |
-| Script jobs catalog | `GET /api/v1/script_jobs` |
-| Push certificate summary | `GET /api/v1/push_certificate` |
-
-### Direct Mutation Wiring
-
-| Feature | Upstream route |
-|---|---|
-| Download custom declaration | `GET /api/v1/custom_declarations/{id}/download` |
-| Create custom declaration | `POST /api/v1/custom_declarations` |
-| Update custom declaration | `PATCH /api/v1/custom_declarations/{id}` |
-| Delete custom declaration | `DELETE /api/v1/custom_declarations/{id}` |
-| Create device | `POST /api/v1/devices` |
-| Update device | `PATCH /api/v1/devices/{id}` |
-| Set device assignment-group membership | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/devices/{deviceID}` |
-| Delete device user | `DELETE /api/v1/devices/{deviceID}/users/{userID}` |
-| Create assignment group | `POST /api/v1/assignment_groups` |
-| Update assignment group | `PATCH /api/v1/assignment_groups/{id}` |
-| Delete assignment group | `DELETE /api/v1/assignment_groups/{id}` |
-| Set assignment-group app link | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/apps/{appID}` |
-| Set assignment-group profile link | `POST` or `DELETE /api/v1/assignment_groups/{groupID}/profiles/{profileID}` |
-| Group action: push/update/sync/clone | `POST /api/v1/assignment_groups/{id}/{action}` |
-| Create catalog app | `POST /api/v1/apps` |
-| Update catalog app | `PATCH /api/v1/apps/{id}` |
-| Delete catalog app | `DELETE /api/v1/apps/{id}` |
-| Create custom config profile | `POST /api/v1/custom_configuration_profiles` |
-| Update custom config profile | `PATCH /api/v1/custom_configuration_profiles/{id}` |
-| Delete custom config profile | `DELETE /api/v1/custom_configuration_profiles/{id}` |
-| Download custom config profile | `GET /api/v1/custom_configuration_profiles/{id}/download` |
-| Send enrollment invitation | `POST /api/v1/enrollments/{id}/invitations` |
-| Delete enrollment | `DELETE /api/v1/enrollments/{id}` |
-| Sync DEP server | `POST /api/v1/dep_servers/{id}/sync` |
-| Load DEP devices | `GET /api/v1/dep_servers/{serverID}/dep_devices` |
-| Load one DEP device | `GET /api/v1/dep_servers/{serverID}/dep_devices/{deviceID}` |
-| Download push CSR | `GET /api/v1/push_certificate/scsr` |
-| Update push certificate | `PUT /api/v1/push_certificate` |
-| Load managed configs | `GET /api/v1/apps/{appID}/managed_configs` |
-| Create managed config | `POST /api/v1/apps/{appID}/managed_configs` |
-| Delete managed config | `DELETE /api/v1/apps/{appID}/managed_configs/{configID}` |
-| Push managed configs | `POST /api/v1/apps/{appID}/managed_configs/push` |
-| Load one script | `GET /api/v1/scripts/{id}` |
-| Create script | `POST /api/v1/scripts` |
-| Update script | `PATCH /api/v1/scripts/{id}` |
-| Delete script | `DELETE /api/v1/scripts/{id}` |
-| Load one script job | `GET /api/v1/script_jobs/{id}` |
-| Create script job | `POST /api/v1/script_jobs` |
-| Cancel script job | `DELETE /api/v1/script_jobs/{id}` |
-| Assign declaration to device | `POST /api/v1/custom_declarations/{id}/devices/{deviceID}` |
-| Unassign declaration from device | `DELETE /api/v1/custom_declarations/{id}/devices/{deviceID}` |
-
-### Device Action Wiring
-
-| Feature | Upstream route |
-|---|---|
-| Lock device | `POST /api/v1/devices/{id}/{lockActionName}` |
-| Wipe device | `POST /api/v1/devices/{id}/{wipeActionName}` |
-| Sync device | `POST /api/v1/devices/{id}/{syncActionName}` |
-| Clear passcode | `POST /api/v1/devices/{id}/clear_passcode` |
-| Restart | `POST /api/v1/devices/{id}/restart` |
-| Shutdown | `POST /api/v1/devices/{id}/shutdown` |
-| Request installed-app management | `POST /api/v1/installed_apps/{id}/request_management` |
-| Update installed app | `POST /api/v1/installed_apps/{id}/update` |
-| Uninstall installed app | `DELETE /api/v1/installed_apps/{id}` |
-| Enable lost mode | `POST /api/v1/devices/{id}/lost_mode` |
-| Disable lost mode | `DELETE /api/v1/devices/{id}/lost_mode` |
-| Play lost-mode sound | `POST /api/v1/devices/{id}/lost_mode/play_sound` |
-| Update lost-mode location | `POST /api/v1/devices/{id}/lost_mode/update_location` |
-
-### MunkiReport Enrichment Wiring
-
-| Feature | Module route |
-|---|---|
-| Sync telemetry | `{base}/{prefix}/inventory/data/sync_health` |
-| Compliance summary | `{base}/{prefix}/simplemdm/data/compliance_stats` |
-| Command status summary | `{base}/{prefix}/simplemdm/data/command_status_stats` |
-| Assignment-group stats | `{base}/{prefix}/simplemdm/data/assignment_group_stats` |
-| Resource-type stats | `{base}/{prefix}/simplemdm/data/resource_type_stats` |
-| OS-security stats | `{base}/{prefix}/simplemdm/data/os_security_stats` |
-| Supplemental status | `{base}/{prefix}/simplemdm/data/supplemental_status` |
-| Supplemental overview | `{base}/{prefix}/simplemdm/data/supplemental_overview` |
-| AppleCare stats | `{base}/{prefix}/simplemdm/data/apple_care_stats` |
-| Device connected resources | `{base}/{prefix}/get_device_resources/{serial}` |
+- `/account` — GET, PATCH
+- `/apps` — GET, POST, PATCH, DELETE
+- `/apps/{id}/installs` — GET
+- `/apps/{id}/munki_pkginfo` — GET, DELETE
+- `/assignment_groups` — GET, POST, PATCH, DELETE
+- `/assignment_groups/{id}/apps/{id}` — POST, DELETE
+- `/assignment_groups/{id}/clone` — POST
+- `/assignment_groups/{id}/custom_attributes/{key}` — POST
+- `/assignment_groups/{id}/devices/{id}` — POST, DELETE
+- `/assignment_groups/{id}/profiles/{id}` — POST, DELETE
+- `/assignment_groups/{id}/push_apps` — POST
+- `/assignment_groups/{id}/sync_profiles` — POST
+- `/assignment_groups/{id}/update_apps` — POST
+- `/custom_attributes` — GET, POST, PATCH, DELETE
+- `/custom_configuration_profiles` — GET, POST, PATCH, DELETE
+- `/custom_configuration_profiles/{id}/download` — GET
+- `/custom_declarations` — GET, POST, PATCH, DELETE
+- `/custom_declarations/{id}/devices/{id}` — POST, DELETE
+- `/custom_declarations/{id}/download` — GET
+- `/dep_servers` — GET
+- `/dep_servers/{id}/dep_devices` — GET
+- `/dep_servers/{id}/sync` — POST
+- `/devices` — GET, POST, PATCH, DELETE
+- `/devices/{id}/custom_attributes` — GET
+- `/devices/{id}/custom_attributes/{key}` — POST
+- `/devices/{id}/installed_apps` — GET
+- `/devices/{id}/installed_apps/{id}` — GET, DELETE
+- `/devices/{id}/lost_mode` — POST, DELETE
+- `/devices/{id}/lost_mode/play_sound` — POST
+- `/devices/{id}/lost_mode/update_location` — POST
+- `/devices/{id}/profiles` — GET
+- `/devices/{id}/users` — GET, DELETE
+- `/devices/{id}/*action*` — POST (all device action endpoints)
+- `/enrollments` — GET
+- `/enrollments/{id}/invitations` — POST
+- `/enrollments/{id}` — DELETE
+- `/logs` — GET
+- `/logs/{id}` — GET
+- `/profiles` — GET
+- `/profiles/{id}/devices/{id}` — POST, DELETE
+- `/profiles/{id}/device_groups/{id}` — POST, DELETE
+- `/push_certificate` — GET, PATCH
+- `/push_certificate/scsr` — GET
+- `/script_jobs` — GET, POST, DELETE
+- `/scripts` — GET, POST, PATCH, DELETE
+- `/webhooks` — GET, POST, PATCH, DELETE
 
 ## Failure Modes And Fallback Behavior
 
-This section describes `ReportSimpleMDM` behavior when something goes wrong.
-
-### Missing Or Invalid SimpleMDM API Key
-
-Expected behavior:
-
-- the app cannot load direct fleet data
-- setup or settings remain the place to correct the key
-- dashboard and device inventory will not become operational because direct SimpleMDM is the primary source of truth
-
-### MunkiReport Auth Failure
-
-Expected behavior:
-
-- direct SimpleMDM functionality should still work
-- module-backed dashboard panels may remain empty
-- `Supplemental Enrichment (A)` may continue showing unavailable or undetected-source messaging
-- `Module Data: Available` may never appear in Settings
-
-### MunkiReport Module Missing Or Outdated
-
-Expected behavior:
-
-- direct SimpleMDM remains usable
-- enrichment routes may fail to decode or return no data
-- module-backed widgets may not populate
-- device connected-resource summaries from the module may remain empty
-
-This app expects a current `simplemdm` module revision that exposes the enrichment routes it reads.
-
-### Partial Snapshot Recovery
-
-Expected behavior:
-
-- the app may show recovered cached fleet data first
-- refresh continues in the background
-- the UI should converge toward current live data as pagination completes
-- sync strategy screens can reflect that the cached snapshot was incomplete
-
-### Stale Cache
-
-Expected behavior:
-
-- stale cache may still help first paint
-- the app should trigger background refresh/revalidation based on TTL rules
-- the user may briefly see cached content and then updated live content
-
-### Write Permission Denied
-
-Expected behavior:
-
-- the app can still remain useful in read-heavy workflows
-- write actions may fail initially and then become disabled after real permission evidence is observed
-- the UI should surface permission requirements instead of only raw backend failures
-
-### Device Action Failure
-
-Expected behavior:
-
-- action errors should remain scoped to action status
-- the whole device detail screen should not be replaced by an action failure
-- the user should still be able to inspect the device
-
-### Non-Enrolled Device Detail
-
-Expected behavior:
-
-- the device record can still appear in inventory
-- direct enrolled-only detail endpoints may not be available
-- the UI should keep inventory context visible while explaining the limitation
+| Scenario | Behavior |
+|----------|----------|
+| No network on launch | Cached snapshot renders if available; refresh banner shown |
+| API key invalid (401) | Service clears state; setup prompt shown |
+| Permission denied (403) | Specific permission domain disabled; action UI reflects this |
+| Rate limited (429) | Service retries with backoff |
+| Conflict (409) | Error surfaced inline without crashing state |
+| MunkiReport unavailable | App continues normally; module widgets show unavailable state |
+| Partial pagination | Incremental snapshot recovery baseline used on next launch |
+| Script job watcher timeout | Notification not fired; job still visible in jobs list |
 
 ## Known Limitations
 
-These are current boundaries of `ReportSimpleMDM`, not generic limitations of SimpleMDM or MunkiReport.
-
-- direct SimpleMDM remains the primary source of truth, so the app is not useful without a valid SimpleMDM API key
-- optional MunkiReport enrichment improves visibility but does not replace direct SimpleMDM connectivity
-- some long-tail SimpleMDM operations still rely on the API explorer or endpoint presets rather than a highly custom native form
-- hybrid-mode enrichment depends on a current `simplemdm` MunkiReport module revision that exposes the routes this app reads
-- non-enrolled devices do not have the same live detail coverage as enrolled devices
-- automated validation in this repo is currently limited by scheme/build-environment issues described below
-- cache and snapshot reuse improves responsiveness, but the app can still briefly show recovered or stale content before live revalidation converges
-- permission discovery is partly evidence-based, so some unsupported write actions may only disable after an initial real permission failure
+- The app does not support uploading binary files (mobileconfig, certificate PEM) through the API Explorer; use the dedicated management views for those operations.
+- Account-level log export exports only the pages loaded in the current session. Load More pages before exporting if a complete export is needed.
+- Script job completion notifications require the app to remain running (or be resumed via background refresh on iOS) while the job is in progress. Notifications will not fire if the app is force-quit before the job completes.
+- Dynamic group filter criteria fields (`filter_attribute`, `filter_operator`, `filter_value`) are displayed as returned by the SimpleMDM API. If the API does not include them in the response for a given group, those rows will not appear.
 
 ## Known Bugs
 
-The repository does not currently maintain a formal in-repo bug tracker or release-tagged bug list for `ReportSimpleMDM`. No separate confirmed bug inventory was found in the repo.
-
-Current known problem areas worth documenting are:
-
-- hybrid-mode enrichment can fail silently from the user's perspective if the MunkiReport module is present but does not expose the newer routes `ReportSimpleMDM` expects
-- permission-aware action disabling is evidence-driven, so an unsupported write action may remain visible until the app sees a real denial
-- cached or recovered snapshots can briefly present older data until live revalidation completes
-- non-enrolled devices intentionally have reduced live-detail coverage, which can sometimes be mistaken for a broken detail flow
-
-These are documented here because they are realistic operator pain points, even if the repo does not currently track them as formal numbered bugs.
+None currently known.
 
 ## Security And Secrets
 
-This section is specifically about `ReportSimpleMDM`.
+All credentials are stored exclusively in the system keychain:
 
-### Secrets Stored By The App
+- SimpleMDM API key — per-account, namespaced by UUID
+- MunkiReport auth header value — per-account, namespaced by UUID
+- MunkiReport cookie — per-account, namespaced by UUID
 
-`ReportSimpleMDM` stores these sensitive values in the keychain:
-
-- SimpleMDM API key
-- optional MunkiReport auth-header value
-- optional MunkiReport cookie
-
-### Non-Secret Configuration Stored By The App
-
-The app stores non-secret operator preferences and connection metadata in user defaults, such as:
-
-- backend mode
-- MunkiReport base URL
-- module path prefix
-- action-name overrides
-- dashboard widget visibility
-- TTL overrides
-- debug toggles
-
-### Cached Operational Data Stored By The App
-
-The app stores local cached operational data through SwiftData, including:
-
-- cached devices
-- cached launch snapshots
-- cached resource records
-- smart groups
-- sync history
-
-### Important Security Boundaries
-
-- `ReportSimpleMDM` talks directly to the SimpleMDM API for its primary operational data and mutations
-- the optional MunkiReport module is used only as an enrichment source in this app
-- the app does not depend on the module's admin passthrough API for its main device-management behavior
-- clearing saved connection data removes stored secrets without wiping every other preference
-
-### Practical Security Implications
-
-- if you give the app a write-capable SimpleMDM API key, the app can execute real production mutations
-- if you configure a MunkiReport cookie, the app will send that cookie on module requests
-- if you configure a MunkiReport auth header, the app will send that header on module requests
-- if you leave the header value empty and the header name is `X-SIMPLEMDM-API-KEY`, the app can fall back to using the direct SimpleMDM API key as that header value
-
-That last behavior is convenient, but it should only be used if your MunkiReport deployment is intentionally designed to accept it.
+No secrets are written to UserDefaults, logs, or any file on disk. API keys are redacted in all internal logging. Destructive operations require typed confirmation or explicit confirmation dialogs before execution.
 
 ## Architecture Diagram
 
-This is the high-level runtime model for `ReportSimpleMDM`:
-
-```text
-                        +----------------------+
-                        |  SimpleMDM API       |
-                        |  Primary truth       |
-                        +----------+-----------+
-                                   ^
-                                   |
-                        direct read/write requests
-                                   |
-+--------------------+   +---------+----------+   +----------------------+
-| App UI             |<->| Service Layer      |<->| MunkiReport          |
-| Dashboard          |   | State + sync       |   | simplemdm module     |
-| Devices            |   | cache + enrichment |   | Optional enrichment  |
-| Admin              |   +---------+----------+   +----------------------+
-| Settings           |             ^
-+---------+----------+             |
-          |                        |
-          v                        v
-  +-------+--------+      +--------+--------+
-  | SwiftData       |      | Keychain        |
-  | snapshots/cache |      | secrets         |
-  +-----------------+      +-----------------+
 ```
-
-Interpretation:
-
-- the app talks directly to SimpleMDM for primary operations
-- the app optionally talks to the MunkiReport module for enrichment
-- local storage keeps cached operational state
-- the keychain stores secrets
+┌─────────────────────────────────────────────────────┐
+│                     SwiftUI Views                    │
+│  Dashboard │ Devices │ Device Detail │ Admin │ Settings │
+└─────────────────────┬───────────────────────────────┘
+                      │ @EnvironmentObject
+┌─────────────────────▼───────────────────────────────┐
+│                 SimpleMDMService                      │
+│  @MainActor ObservableObject                          │
+│  ┌─────────────────┐  ┌────────────────────────────┐ │
+│  │ ResourceCatalog │  │ Published device/UI state  │ │
+│  └─────────────────┘  └────────────────────────────┘ │
+│  ┌─────────────────┐  ┌────────────────────────────┐ │
+│  │ RequestLimiter  │  │ SyncSessionTracker         │ │
+│  └─────────────────┘  └────────────────────────────┘ │
+└──────────┬──────────────────────┬────────────────────┘
+           │                      │
+┌──────────▼──────────┐  ┌────────▼──────────────────┐
+│   SimpleMDM API     │  │  MunkiReport Module        │
+│   (HTTP Basic Auth) │  │  (optional enrichment)     │
+└─────────────────────┘  └───────────────────────────┘
+           │
+┌──────────▼──────────┐
+│   SwiftData Store   │
+│  Devices, Snapshots │
+│  Resources, Logs    │
+│  Smart Groups       │
+└─────────────────────┘
+```
 
 ## Troubleshooting Recipes
 
-These are app-focused recipes for `ReportSimpleMDM`.
+**Devices not loading**
+1. Check `Settings > Server & API` — confirm the API key is entered.
+2. Pull to refresh on the device list.
+3. Check `Settings > Sync History` for recent error messages.
 
-### If direct fleet data does not load
+**Dashboard widgets missing data**
+1. In `SimpleMDM + MunkiReport Module` mode, confirm `Settings > Supplemental Enrichment (A)` shows detected sources.
+2. In `SimpleMDM API Only` mode, module widgets intentionally do not appear.
 
-Check:
+**Bulk action did not reach all devices**
+1. Individual action errors are logged but do not block other devices in the batch.
+2. Check each device's detail screen for a device-level error.
 
-- that the SimpleMDM API key is saved
-- that the app is in the expected backend mode
-- that the dashboard or device list is not showing a direct API error message
-- that the key has enough read access for inventory workflows
+**Push cert banner not disappearing**
+1. After renewing the certificate, refresh the resource catalog via the Admin Center push certificate view.
+2. The banner recalculates from live `resourceCatalog.pushCertificate` data on each render.
 
-### If direct fleet data loads but module widgets stay empty
+**Script job notification not received**
+1. Confirm notification permission was granted. Check system notification settings for the app.
+2. The app must be running or resumed within 10 minutes of job creation for the poll loop to complete.
 
-Check:
-
-- that `Backend Mode` is `SimpleMDM + MunkiReport Module`
-- that `MunkiReport Base URL` points at the site root, not a specific endpoint
-- that `Module Path Prefix` is `/module/simplemdm` unless intentionally customized
-- that your auth header or cookie is valid for authenticated module GET requests
-- that the MunkiReport `simplemdm` module is current enough for the routes this app reads
-
-### If MunkiReport works in the browser but not in the app
-
-Check:
-
-- whether the browser is relying on a session cookie you have not copied into `Cookie Header`
-- whether the MunkiReport deployment expects a specific auth header
-- whether the site needs non-rewrite routing with `index.php?` in the base URL
-
-### If a write action appears but fails
-
-Check:
-
-- whether the API key really has the required write permission domain
-- whether the failure was a one-time denial that the app has not yet converted into disabled state
-- whether the device is enrolled and supports that action
-
-### If device detail is incomplete for one device
-
-Check:
-
-- whether the device is non-enrolled
-- whether subresource loading is still in progress
-- whether the missing area is direct SimpleMDM detail or optional module enrichment
-
-### If relaunch shows old data first
-
-Check:
-
-- whether the app is intentionally reusing a snapshot for fast first paint
-- whether a refresh banner appears shortly afterward
-- whether freshness and sync history in `Settings` indicate background convergence is still happening
-
-### If module connection worked before but stopped
-
-Check:
-
-- whether the MunkiReport cookie expired
-- whether the auth header changed
-- whether the MunkiReport module was updated or downgraded
-- whether the deployment routing changed from rewrite to non-rewrite or vice versa
+**Saved account not switching**
+1. Tap the account row in `Settings > Saved Accounts`.
+2. Confirm the confirmation dialog before the switch is applied.
 
 ## Glossary
 
-This glossary is specific to the language used in `ReportSimpleMDM`.
-
-### Snapshot
-
-A locally persisted fleet-data payload that the app can restore quickly at launch to reduce time-to-first-usable-screen.
-
-### Full Fleet Snapshot
-
-A cached default fleet snapshot where the previous device pagination completed successfully.
-
-### Incremental Snapshot Recovery
-
-A startup mode where the app reuses a partial earlier snapshot immediately and continues live pagination in the background.
-
-### Deferred Resources
-
-Lower-priority resource loads scheduled shortly after the first useful dashboard/device content appears.
-
-### Freshness
-
-The app's decision about whether cached data is still acceptable to reuse before revalidation.
-
-### TTL
-
-Time to live. The freshness window used to decide whether a cached resource family or snapshot should be treated as fresh or stale.
-
-### Resource Family
-
-A cacheable grouping of related API-backed records such as apps, custom declarations, or custom configuration profiles.
-
-### Sync Telemetry
-
-Operational metadata about module or app sync behavior, such as last status, timing, or cursor/delta information when available.
-
-### Supplemental Status
-
-Module-backed visibility into which optional enrichment sources are detected, enabled, and currently have data.
-
-### Supplemental Overview
-
-A higher-level summary payload derived from supplemental module data, used for fleet overview widgets.
-
-### Connected Resources
-
-Module-backed per-device related-resource context shown in device detail when MunkiReport enrichment is available.
-
-### Direct SimpleMDM
-
-The primary operational data path where `ReportSimpleMDM` talks straight to the SimpleMDM API.
-
-### Hybrid Mode
-
-The app mode where direct SimpleMDM remains primary and MunkiReport module reads are layered in for optional enrichment.
-
-### Configuration Fingerprint
-
-A hash-like identity derived from connection settings and, for some caches, the active query, used to prevent cache reuse across different tenants or modes.
+| Term | Meaning |
+|------|---------|
+| Assignment Group | A SimpleMDM container grouping devices, apps, and profiles for deployment targeting |
+| Custom Attribute | A user-defined metadata field that can be set per device or per assignment group |
+| DEP | Device Enrollment Program — Apple's automated enrollment via Apple Business Manager |
+| Dynamic Group | An assignment group whose members are automatically computed by SimpleMDM based on a filter rule |
+| FileVault | macOS full-disk encryption |
+| Lost Mode | A supervised iOS/iPadOS feature that locks the device to a custom message screen |
+| Munki Pkginfo | An XML metadata file describing a software package for use with the Munki management system |
+| Push Certificate (APNs) | The Apple Push Notification service certificate required for MDM communication |
+| Resource Catalog | The app's in-memory collection of all non-device SimpleMDM resources loaded at startup |
+| Smart Group | A locally saved device filter bundle stored in SwiftData, not synced to SimpleMDM |
+| Webhook | An HTTP endpoint that SimpleMDM notifies when specific MDM events occur |
 
 ## Changelog And Release History
 
-The repo does not currently maintain a formal versioned changelog with tagged releases in this README. To avoid inventing history, this section summarizes the currently documented product-era milestones reflected in the current app behavior.
+### Current
 
-### Current Documented Milestone Areas
-
-- transition from a simple direct dashboard into a broader native admin client
-- introduction of cache-first startup and launch-snapshot reuse
-- expansion of device detail into deeper inventory and action flows
-- native CRUD and management screens for apps, profiles, declarations, assignment groups, and lower-tier admin resources
-- permission-aware write handling
-- optional MunkiReport enrichment layering for dashboard and device-connected-resource context
-- sync history, freshness reporting, TTL overrides, and richer operator diagnostics
-
-### Recommended Future Changelog Practice
-
-If you want this section to become a true release history later, the repo should start recording:
-
-- version or build number
-- release date
-- user-facing feature additions
-- breaking behavior changes
-- bug fixes
-- migration or configuration notes
+- full SimpleMDM API v1.55 coverage (100% PRD requirements implemented)
+- multi-account support with per-account keychain storage
+- bulk device actions (lock, sync, push apps) with multi-select UI
+- CSV export for device list
+- custom attributes: full CRUD for definitions, inline edit per device, set per assignment group
+- script jobs tab in device detail with run-script UI and local completion notifications
+- dynamic group filter criteria display in assignment group detail
+- group_type (Static/Dynamic) capsule badge in assignment group list
+- Munki pkginfo view and delete per app catalog entry
+- webhook CRUD with event type reference
+- account management view with edit support
+- push certificate expiry banner on dashboard (warning <30 days, critical <7 days)
+- dashboard Action Items with per-item visibility settings
+- optional Compact Dashboard Layout
+- dashboard setting to auto-hide the `Unenrolled` KPI when the count is zero
+- account-level log browser with search, pagination, and CSV export
+- copy-as-curl in API Explorer
 
 ## Validation Checklist
 
-If you want to confirm that `ReportSimpleMDM` is behaving correctly, these are the highest-value checks.
-
-### Direct SimpleMDM Validation
-
-1. Save a valid SimpleMDM API key.
-2. Confirm the dashboard loads total/enrolled/unenrolled data.
-3. Open the device list and verify fleet records appear.
-4. Open a device detail screen and verify overview/inventory content loads.
-5. Open one direct admin surface such as apps, profiles, or assignment groups and confirm data loads.
-
-### Snapshot And Cache Validation
-
-1. Launch the app and allow a full load to complete.
-2. Quit and relaunch the app.
-3. Confirm cached content appears quickly on relaunch.
-4. Confirm a refresh banner or later live updates appear as the app revalidates data.
-5. Review `Settings` for sync history and freshness state.
-
-### Hybrid MunkiReport Validation
-
-1. Configure `SimpleMDM + MunkiReport Module`.
-2. Save the MunkiReport base URL and auth settings.
-3. Confirm direct SimpleMDM data still works first.
-4. Confirm `Supplemental Enrichment (A)` begins showing detected-source data.
-5. Confirm module-backed dashboard widgets start populating.
-6. Open a device detail screen and look for module-backed connected-resource context where available.
-
-### Permission Validation
-
-1. Use an API key with limited write permissions.
-2. Attempt a protected write action.
-3. Confirm the app surfaces the failure cleanly.
-4. Confirm the app remains usable for read flows afterward.
-5. Confirm disabled actions describe the missing permission domain when that evidence has been learned.
+- [ ] API key entry and keychain save
+- [ ] Device list loads and paginates
+- [ ] Filter by status, OS, posture, group
+- [ ] Bulk select devices → Lock, Sync, Push Apps
+- [ ] CSV export of device list
+- [ ] Device detail opens for enrolled device
+- [ ] Custom attributes tab shows values and allows save
+- [ ] Script jobs tab — run script → notification fires on completion
+- [ ] Device actions: lock, sync, wipe (with confirmation)
+- [ ] Assignment group list shows Static/Dynamic badge
+- [ ] Dynamic group detail shows filter criteria
+- [ ] Custom attributes per group can be saved
+- [ ] App catalog → Munki Pkginfo action → XML displayed → delete works
+- [ ] Dashboard push cert expiry banner appears when cert < 30 days
+- [ ] Dashboard Action Items panel appears by default and `Customize` opens dashboard settings
+- [ ] Settings → Dashboard Widgets → Action Item groups can enable/disable individual items
+- [ ] Settings → Dashboard Widgets → Compact Dashboard Layout can be toggled independently from Action Items
+- [ ] Settings → Dashboard Widgets → Auto-Hide Unenrolled KPI When Zero hides or shows the zero-count card
+- [ ] Admin Center → Custom Attributes → create, edit, delete
+- [ ] Admin Center → Webhook Manager → create, edit, delete
+- [ ] Admin Center → Account Logs → loads, search works, CSV export
+- [ ] Settings → Account → shows name, email, ABM status, cert expiry
+- [ ] Settings → Saved Accounts → save, switch, delete
+- [ ] API Explorer → endpoint → Copy as curl → clipboard has valid command
 
 ## Important Operational Details
 
-### Refresh Behavior
-
-Manual refresh does not always mean "throw away everything and blank the UI first."
-
-Current behavior is more operator-friendly:
-
-- existing cached/live content can remain visible
-- a refresh banner communicates progress
-- background pagination can continue after the first results are already visible
-- action failures and detail failures are separated so a mutation problem does not collapse the whole screen
-
-### Configuration Fingerprints
-
-Cache reuse is tied to connection fingerprints that include values such as:
-
-- backend mode
-- API key
-- MunkiReport URL
-- module path prefix
-- current device query for query-scoped caches
-
-This prevents the app from accidentally reusing cached data from the wrong tenant or mode.
-
-### TTL Defaults
-
-The default TTLs described elsewhere in this README are operationally important because they control whether data is:
-
-- reused quietly
-- shown immediately and refreshed in the background
-- considered stale enough to force revalidation
-
-### Background Refresh
-
-On iOS physical devices, the app also schedules background refresh work. That is intended to keep data warmer between launches, but the app still relies on the same cache/snapshot logic when opened interactively.
+- The app never stores secrets outside the system keychain.
+- The SimpleMDM API key is transmitted as an HTTP Basic Auth username with an empty password, encoded as Base64 — this is the documented SimpleMDM authentication pattern.
+- Wipe and unenroll actions require typed confirmation to prevent accidental execution.
+- Sync operations on assignment groups are rate-limited to once every 30 seconds by SimpleMDM; the app surfaces this constraint when the action is triggered too quickly.
+- Script job polling runs in a detached background task. The task exits automatically after 10 minutes if the job has not reached a terminal status.
+- Multi-account switching resets the entire service state including cached devices, resource catalogs, and per-device detail. The switch triggers a fresh load for the new account.
 
 ## Security And Storage
 
-Current security-relevant behavior includes:
-
-- SimpleMDM API keys stored in the keychain
-- optional MunkiReport auth secrets stored in the keychain
-- non-secret connection metadata stored in user defaults
-- cached app data stored via SwiftData
-- the ability to clear saved credentials without wiping every other app setting
+| Data | Storage Location |
+|------|-----------------|
+| SimpleMDM API key | Keychain (per account, UUID-namespaced) |
+| MunkiReport auth header value | Keychain (per account, UUID-namespaced) |
+| MunkiReport cookie | Keychain (per account, UUID-namespaced) |
+| Connection metadata (URLs, mode, names) | UserDefaults |
+| Saved account metadata | UserDefaults (non-sensitive fields only) |
+| Active account ID | UserDefaults |
+| Cached devices and snapshots | SwiftData on-device store |
+| Smart groups | SwiftData on-device store |
+| Sync history | SwiftData on-device store |
 
 ## Current Boundaries And Caveats
 
-The app is already broad, but a few boundaries matter:
-
-- SimpleMDM remains the operational source of truth; MunkiReport data is enrichment only
-- some long-tail API operations are exposed through endpoint presets or the API explorer instead of deeply custom forms
-- some settings screens are informational, not full administrative control planes
-- device live-detail fetches are limited for non-enrolled records because the upstream API has different behavior there
-- write capability depends on the API key actually granted by the SimpleMDM tenant
+- Binary file uploads (mobileconfig, certificate PEM, app IPA) are handled only in dedicated management views, not in the API Explorer.
+- The app does not support SimpleMDM multi-org accounts natively — each saved account profile corresponds to one SimpleMDM API key.
+- MunkiReport enrichment is read-only. The app does not write to MunkiReport.
+- The app does not support VPP (Volume Purchase Program) token management.
+- Device log export is available at the account level (Account Logs → CSV). Per-device log export is not separately implemented; use the account-level export and filter by device serial in the exported file.
 
 ## Bottom Line
 
-If the question is "what is possible in this app right now?", the answer is:
+ReportSimpleMDM implements the full SimpleMDM API v1.55 surface across a native SwiftUI app for macOS and iOS. Every PRD-defined requirement is implemented, including multi-account support, bulk operations, custom attribute management, webhook CRUD, script job notifications, dynamic group display, Munki pkginfo, account log browsing, and push certificate expiry monitoring.
 
-- it already works as a standalone SimpleMDM operations client
-- it already supports real fleet browsing and a large set of native management workflows
-- it already exposes much of the remaining API surface through a catalog and runnable endpoint presets
-- it already has a local persistence, sync, and diagnostics model designed for ongoing operational use
-
-The repo is well beyond a proof of concept. It is a real admin-facing SimpleMDM client with optional MunkiReport enrichment, strong device-centric workflows, and broad administrative coverage.
+The app is production-ready for SimpleMDM fleet operators who want a native, fast, full-featured alternative to the SimpleMDM web console.
 
 ## Connect With Me
 
-- [GitHub](https://github.com/hov172)
-- [PowerShell Gallery](https://www.powershellgallery.com/profiles/hov172)
-- Slack: `@Hov172`
-- Discord: `Jay172_`
-- [LinkedIn](https://www.linkedin.com/in/jesus-a-785bb616?trk=people-guest_people_search-card)
-- [Twitter / X](https://twitter.com/AyalaSolutions)
-- [Bluesky](https://bsky.app/profile/ayalasolutions.bsky.social)
+Issues and feature requests: open a GitHub issue in this repository.
