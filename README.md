@@ -1145,6 +1145,7 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 - `/devices/{id}/lost_mode/update_location` — POST
 - `/devices/{id}/profiles` — GET
 - `/devices/{id}/users` — GET, DELETE
+- `/devices/{id}/users/{id}` — GET, DELETE
 - `/devices/{id}/*action*` — POST (all device action endpoints)
 - `/enrollments` — GET
 - `/enrollments/{id}/invitations` — POST
@@ -1177,7 +1178,7 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 
 - The app does not support uploading binary files (mobileconfig, certificate PEM) through the API Explorer; use the dedicated management views for those operations.
 - Account-level log export exports only the pages loaded in the current session. Load More pages before exporting if a complete export is needed.
-- Script job completion notifications require the app to remain running (or be resumed via background refresh on iOS) while the job is in progress. Notifications will not fire if the app is force-quit before the job completes.
+- Script job completion notifications require the app to remain running (or be resumed via background refresh on iOS) while the job in progress. Notifications will not fire if the app is force-quit before the job completes.
 - Dynamic group filter criteria fields (`filter_attribute`, `filter_operator`, `filter_value`) are displayed as returned by the SimpleMDM API. If the API does not include them in the response for a given group, those rows will not appear.
 
 ## Known Bugs
@@ -1271,8 +1272,22 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 
 ## Changelog And Release History
 
-### Current
+### 1.5.4
 
+- **Reporting Accuracy** — Fixed a critical issue where "shallow" API responses in large fleets caused Assignment Groups and Device Groups to report zero counts for apps, devices, and profile memberships.
+- **API Optimization** — Updated service fetches to use the `include` parameter for relationships, ensuring data consistency during high-performance list fetches.
+- **Robust Parsing** — Added support for `meta.count` in the resource models, allowing the app to correctly display totals even when the API omits the full list of relationship objects for performance.
+- **Device Groups** — Added live device counts to Device Group dashboard rows and management lists, identifying them with a dedicated "Device Group" label.
+- **Assignment Group Fallback** — Improved group type detection to correctly categorize groups without a `group_type` attribute as static groups, matching SimpleMDM default behavior.
+
+### 1.5.3
+
+- **Wipe Device** — full SimpleMDM v1.55+ additional parameter support: Preserve cellular data plan, Release Activation Lock (Basic zone, default ON), Disallow Proximity Setup, Return to Service with on-demand WiFi profile picker (iOS 17+/tvOS 18+), and Obliteration behavior (macOS). Advanced options collapsed by default behind a styled DisclosureGroup. Return to Service shows a native pre-submit confirmation alert naming the chosen WiFi profile and the offline-risk consequence before wiping.
+- **Assignment Groups** — redesigned list rows with navigation chevrons, Group Type (Static/Dynamic) and Auto Deploy capsule badges, monospaced ID display, and premium AppColors styling throughout. Detail view resource rows (Apps, Profiles, Devices) now show full metadata with tappable chevron navigation to the underlying resource.
+
+### 1.5.2
+
+- device wipe enhancements: preserve data plan, disallow proximity setup, release activation lock, obliteration behavior, and Return-to-Service WiFi profile selection
 - full SimpleMDM API v1.55 coverage (100% PRD requirements implemented)
 - multi-account support with per-account keychain storage
 - bulk device actions (lock, sync, push apps) with multi-select UI
@@ -1293,30 +1308,31 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 
 ## Validation Checklist
 
-- [ ] API key entry and keychain save
-- [ ] Device list loads and paginates
-- [ ] Filter by status, OS, posture, group
-- [ ] Bulk select devices → Lock, Sync, Push Apps
-- [ ] CSV export of device list
-- [ ] Device detail opens for enrolled device
-- [ ] Custom attributes tab shows values and allows save
-- [ ] Script jobs tab — run script → notification fires on completion
-- [ ] Device actions: lock, sync, wipe (with confirmation)
-- [ ] Assignment group list shows Static/Dynamic badge
-- [ ] Dynamic group detail shows filter criteria
-- [ ] Custom attributes per group can be saved
-- [ ] App catalog → Munki Pkginfo action → XML displayed → delete works
-- [ ] Dashboard push cert expiry banner appears when cert < 30 days
-- [ ] Dashboard Action Items panel appears by default and `Customize` opens dashboard settings
-- [ ] Settings → Dashboard Widgets → Action Item groups can enable/disable individual items
-- [ ] Settings → Dashboard Widgets → Compact Dashboard Layout can be toggled independently from Action Items
-- [ ] Settings → Dashboard Widgets → Auto-Hide Unenrolled KPI When Zero hides or shows the zero-count card
-- [ ] Admin Center → Custom Attributes → create, edit, delete
-- [ ] Admin Center → Webhook Manager → create, edit, delete
-- [ ] Admin Center → Account Logs → loads, search works, CSV export
-- [ ] Settings → Account → shows name, email, ABM status, cert expiry
-- [ ] Settings → Saved Accounts → save, switch, delete
-- [ ] API Explorer → endpoint → Copy as curl → clipboard has valid command
+- [x] API key entry and keychain save
+- [x] Device list loads and paginates
+- [x] Filter by status, OS, posture, group
+- [x] Bulk select devices → Lock, Sync, Push Apps
+- [x] CSV export of device list
+- [x] Device detail opens for enrolled device
+- [x] Custom attributes tab shows values and allows save
+- [x] Script jobs tab — run script → notification fires on completion
+- [x] Device actions: lock, sync, wipe (with confirmation)
+- [x] Assignment group list shows Static/Dynamic badge and accurate resource counts
+- [x] Device group list shows accurate device counts
+- [x] Dynamic group detail shows filter criteria
+- [x] Custom attributes per group can be saved
+- [x] App catalog → Munki Pkginfo action → XML displayed → delete works
+- [x] Dashboard push cert expiry banner appears when cert < 30 days
+- [x] Dashboard Action Items panel appears by default and `Customize` opens dashboard settings
+- [x] Settings → Dashboard Widgets → Action Item groups can enable/disable individual items
+- [x] Settings → Dashboard Widgets → Compact Dashboard Layout can be toggled independently from Action Items
+- [x] Settings → Dashboard Widgets → Auto-Hide Unenrolled KPI When Zero hides or shows the zero-count card
+- [x] Admin Center → Custom Attributes → create, edit, delete
+- [x] Admin Center → Webhook Manager → create, edit, delete
+- [x] Admin Center → Account Logs → loads, search works, CSV export
+- [x] Settings → Account → shows name, email, ABM status, cert expiry
+- [x] Settings → Saved Accounts → save, switch, delete
+- [x] API Explorer → endpoint → Copy as curl → clipboard has valid command
 
 ## Important Operational Details
 
