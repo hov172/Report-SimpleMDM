@@ -1183,7 +1183,7 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 
 ## Known Bugs
 
-None currently known.
+None currently known. (Fixed in 1.5.5: dashboard count corruption from active search, search result truncation, and spurious error banner.)
 
 ## Security And Secrets
 
@@ -1271,6 +1271,18 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 | Webhook | An HTTP endpoint that SimpleMDM notifies when specific MDM events occur |
 
 ## Changelog And Release History
+
+### 1.5.5 (Build 3)
+
+- **Search Match Reason** — When a device matches a search term on a field that isn't visible in the list row (OS version, IP address, IMEI, phone number, assignment group, device group, or custom attribute), a labeled hint (e.g. "Assignment group: Marketing") now appears below the row so the match is always explained.
+- **OS Version Filter — Starts With** — The OS Version filter now groups by major.minor (e.g. "14.5") and matches any patch release (14.5.0, 14.5.1, 14.5.2, …), eliminating long duplicate lists of nearly identical versions.
+- **Dashboard Snapshot Age** — A subtle "Updated X ago" timestamp now appears below the KPI bar on the dashboard, updated whenever the device list is refreshed or a new snapshot is computed.
+- **Dashboard Count Accuracy** — Fixed a bug where typing in the device search box triggered a server-side paged fetch that replaced the full device list with only the first page of results. Dashboard KPI counts (Total Devices, Enrolled, Unenrolled) and Action Item totals now always reflect the complete fleet regardless of active search text.
+- **Search Result Completeness** — Text search now runs entirely as a local filter against all loaded devices. Searching "iMac" (or any term) now returns all matches across the full fleet rather than being capped at the first API page (~100 results).
+- **Expanded Search Fields** — Device search now matches across name, serial number, model name (including model year and chip, e.g. "M1 2021"), OS version, IP address, IMEI, phone number, assignment group names, device group name, and custom attribute string values.
+- **Error Banner Fixed** — Resolved a spurious "The operation couldn't be completed. (ServiceError error 4.)" banner appearing on the dashboard. The error description function now correctly identifies `ServiceError` values that have been bridged through NSError, ensuring user-readable messages are always shown.
+- **Snapshot Isolation** — Dashboard snapshot is now protected from corruption when server-side filters (awaiting enrollment, secret custom attributes) are active. Counts shown on the dashboard remain anchored to the last full-population refresh.
+- **UI Consistency** — Removed misleading "Server-filtered query" labels and incremental-load warnings that were shown during local-only text searches.
 
 ### 1.5.4
 
@@ -1371,18 +1383,6 @@ ReportSimpleMDM implements the full SimpleMDM API v1.55 surface across a native 
 
 The app is production-ready for SimpleMDM fleet operators who want a native, fast, full-featured alternative to the SimpleMDM web console.
 
----
-## 🌐 Connect With Me
-- [GitHub](https://github.com/hov172)  
-- [PowerShell Gallery](https://www.powershellgallery.com/profiles/hov172)  
-- 📨 Slack: **@Hov172**  
-- 🕹️ Discord: **Jay172_**  
-- [LinkedIn](https://www.linkedin.com/in/jesus-a-785bb616?trk=people-guest_people_search-card)  
-- 🐦 [Twitter / X (@AyalaSolutions)](https://twitter.com/AyalaSolutions)  
-- <a href="https://bsky.app/profile/ayalasolutions.bsky.social"><img src="https://raw.githubusercontent.com/bluesky-social/social-app/main/assets/logo.png" width="20" alt="Bluesky Logo"></a> [@AyalaSolutions](https://bsky.app/profile/ayalasolutions.bsky.social)  
-- [![Buy Me A Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hov172)  
-- 📧 *Contact via GitHub, Social accounts issues or discussions*  
+## Connect With Me
 
----
-
-⭐ *If you find my tools useful, consider giving them a star to support future development!*
+Issues and feature requests: open a GitHub issue in this repository.
