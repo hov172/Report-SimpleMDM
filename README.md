@@ -14,7 +14,7 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
   <img src="Images/screen4.png" width="220" alt="ReportSimpleMDM screenshot 4">
   <img src="Images/screen5.png" width="220" alt="ReportSimpleMDM screenshot 5">
 </p>
----
+
 ## Table Of Contents
 
 - [What The App Can Do Today](#what-the-app-can-do-today)
