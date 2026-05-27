@@ -4,36 +4,22 @@ ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS and 
 
 The app is designed first as a standalone SimpleMDM operations client. Optional MunkiReport enrichment is supported but additive rather than foundational.
 
----
 ## Screenshots
 
-<p align="center">
-  <img src="./Images/screen1.jpg" width="900" alt="Dashboard" />
-</p>
+### Dashboard — KPI & Action Items
+![Dashboard KPI bar, Action Items, Enrollment Status, and OS Versions breakdown](Images/screen1.jpg)
 
-<br>
+### Dashboard — Device Posture & Resources
+![Device Posture stats and Live API Resource cards](Images/screen2.jpg)
 
-<p align="center">
-  <img src="./Images/screen2.jpg" width="900" alt="Devices" />
-</p>
+### Device Inventory
+![Device list with status and OS filters, search bar, serial, and last-seen timestamps](Images/screen3.jpg)
 
-<br>
+### Admin Center
+![Admin Center showing API coverage counts and runnable endpoint presets](Images/screen4.jpg)
 
-<p align="center">
-  <img src="./Images/screen3.jpg" width="900" alt="Device Detail" />
-</p>
-
-<br>
-
-<p align="center">
-  <img src="./Images/screen4.jpg" width="900" alt="Admin" />
-</p>
-
-<br>
-
-<p align="center">
-  <img src="./Images/screen5.jpg" width="900" alt="Settings" />
-</p>
+### Settings
+![Settings menu listing Admin Center, Assignment Groups, App Catalog, Profiles, Enrollments, DEP Servers, Push Certificate, and Managed App Configs](Images/screen5.jpg)
 
 ## Table Of Contents
 
