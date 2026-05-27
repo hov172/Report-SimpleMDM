@@ -4,7 +4,17 @@ ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS and 
 
 The app is designed first as a standalone SimpleMDM operations client. Optional MunkiReport enrichment is supported but additive rather than foundational.
 
+---
+## Screenshots
 
+<p align="center">
+  <img src="Images/screen1.png" width="220" alt="ReportSimpleMDM screenshot 1">
+  <img src="Images/screen2.png" width="220" alt="ReportSimpleMDM screenshot 2">
+  <img src="Images/screen3.png" width="220" alt="ReportSimpleMDM screenshot 3">
+  <img src="Images/screen4.png" width="220" alt="ReportSimpleMDM screenshot 4">
+  <img src="Images/screen5.png" width="220" alt="ReportSimpleMDM screenshot 5">
+</p>
+---
 ## Table Of Contents
 
 - [What The App Can Do Today](#what-the-app-can-do-today)
