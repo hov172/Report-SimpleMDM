@@ -8,31 +8,31 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 ## Screenshots
 
 <p align="center">
-  <img src="./Images/screen1.png" width="900" alt="Dashboard" />
+  <img src="./Images/screen1.jpg" width="900" alt="Dashboard" />
 </p>
 
 <br>
 
 <p align="center">
-  <img src="./Images/screen2.png" width="900" alt="Devices" />
+  <img src="./Images/screen2.jpg" width="900" alt="Devices" />
 </p>
 
 <br>
 
 <p align="center">
-  <img src="./Images/screen3.png" width="900" alt="Device Detail" />
+  <img src="./Images/screen3.jpg" width="900" alt="Device Detail" />
 </p>
 
 <br>
 
 <p align="center">
-  <img src="./Images/screen4.png" width="900" alt="Admin" />
+  <img src="./Images/screen4.jpg" width="900" alt="Admin" />
 </p>
 
 <br>
 
 <p align="center">
-  <img src="./Images/screen5.png" width="900" alt="Settings" />
+  <img src="./Images/screen5.jpg" width="900" alt="Settings" />
 </p>
 
 ## Table Of Contents
