@@ -825,15 +825,17 @@ The current codebase includes several non-trivial performance and reliability op
 
 - paginated fleet loading
 - background continuation after the first page
-- reuse of cached launch snapshots
+- reuse of cached launch snapshots — dashboard and device list appear at ~160ms on warm launch
 - recovery from incomplete earlier pagination runs
 - per-family resource TTLs
 - deferred secondary resource loading
 - per-device lazy detail hydration
 - reduced repeated recomputation for installed-app joins
-- request throttling through a concurrency limiter
+- request throttling through a cancellation-safe concurrency limiter
 - refresh banners rather than hard UI resets during live reloads
 - sync-history retention capped to the most recent 100 syncs per host
+- `@Observable` granular invalidation — `SimpleMDMService` uses `@Observable` so only views that read a specific property re-render when it changes, eliminating the cascading full-view invalidation that `ObservableObject` caused on every state update
+- inline device list hydration before revalidation starts, so the device list is always populated alongside the dashboard snapshot rather than waiting for background work to free the main actor
 
 The app also distinguishes between:
 
@@ -1233,12 +1235,12 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 │                     SwiftUI Views                    │
 │  Dashboard │ Devices │ Device Detail │ Admin │ Settings │
 └─────────────────────┬───────────────────────────────┘
-                      │ @EnvironmentObject
+                      │ @Environment
 ┌─────────────────────▼───────────────────────────────┐
 │                 SimpleMDMService                      │
-│  @MainActor ObservableObject                          │
+│  @Observable @MainActor                               │
 │  ┌─────────────────┐  ┌────────────────────────────┐ │
-│  │ ResourceCatalog │  │ Published device/UI state  │ │
+│  │ ResourceCatalog │  │ Observed device/UI state   │ │
 │  └─────────────────┘  └────────────────────────────┘ │
 │  ┌─────────────────┐  ┌────────────────────────────┐ │
 │  │ RequestLimiter  │  │ SyncSessionTracker         │ │
@@ -1302,6 +1304,36 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 | Webhook | An HTTP endpoint that SimpleMDM notifies when specific MDM events occur |
 
 ## Changelog And Release History
+
+### 1.5.6 (Build 4)
+
+**SwiftData reliability**
+- **Schema migration infrastructure** — Added `AppSchemaV1` (`VersionedSchema`) and `AppMigrationPlan` (`SchemaMigrationPlan`). Future model changes now migrate cleanly without destroying cached data on app update.
+- **Unique device cache key** — `PersistentDevice.cacheKey` is now `@Attribute(.unique)`, matching the uniqueness enforcement already in place on all other cache-keyed models. Duplicate rows from any upsert edge case are no longer possible.
+- **Sync log pruning** — `pruneSyncLogsIfNeeded` now calls `modelContext.save()` after deleting old entries so pruning is durable across app launches.
+
+**Concurrency correctness**
+- **Cancellation-safe request limiter** — `RequestLimiter.acquire()` now uses `withTaskCancellationHandler` and a UUID-keyed waiter dictionary. Cancelled tasks cleanly remove themselves from the queue and resume with `CancellationError` instead of leaking a hung continuation.
+- **Script job watcher** — `watchScriptJobForCompletion` now propagates `CancellationError` from `Task.sleep` so the poll loop exits immediately on cancellation rather than ignoring it.
+- **Modern CPU offloading** — `sortedDevices` and `buildDashboardSnapshot` are now `@concurrent nonisolated` async functions. All four `Task.detached { }.value` sort/snapshot sites are replaced with direct `await` calls, expressing off-actor intent at the declaration rather than every call site.
+- **Background decoding** — `decodeInBackground` is now `@concurrent`, removing the nested `Task.detached` wrapper.
+- **Removed redundant main-actor hops** — Eliminated two unnecessary `await MainActor.run {}` calls in `DeviceDetailView` that were no-ops (already on the main actor inside a `Task {}` from a `@MainActor` view).
+
+**SwiftUI modernisation**
+- **`@Observable` navigation state** — `AppNavigationState` migrated from `ObservableObject`/`@Published`/`@StateObject`/`@EnvironmentObject` to `@Observable @MainActor`. Views now receive per-property change notifications instead of full-view invalidation on any state change. `AppTab` and `DevicePostureFilter` moved to dedicated files.
+- **`foregroundStyle` everywhere** — Replaced all deprecated `.foregroundColor()` calls with `.foregroundStyle()` across 38 view files.
+- **`clipShape` everywhere** — Replaced all deprecated `.cornerRadius()` calls with `.clipShape(.rect(cornerRadius:))` in `DashboardView`, `DeviceListView`, and `GlassTextField`.
+- **`scrollIndicators` modernised** — Replaced deprecated `showsIndicators:` initializer parameter with `.scrollIndicators()` modifier in `DeviceListView` and `MunkiPkginfoView`.
+- **Account switcher accessibility** — `onTapGesture` in `AccountSwitcherView` replaced with `Button`, making account rows accessible to VoiceOver and Voice Control.
+- **Automatic task cancellation** — `Task {}` inside `DeviceListView.onAppear` for device hydration replaced with `.task {}` modifier so the work is automatically cancelled if the view disappears before it completes.
+
+**Startup diagnostics**
+- **Accurate `totalMs` in deferred hydration log** — The original startup timestamp is now threaded through the full deferred-hydration call chain so the "first publish" log line reflects true wall-clock time from app launch rather than always showing 0ms.
+- **Named publish sources** — Every device-list publish now carries a descriptive source label in the startup timing log (`sync_page`, `query_page`, `load_more`, `startup_page`, `bg_sync_page`, `bg_sync_complete`) instead of `unspecified`.
+
+**Performance — `@Observable` migration for `SimpleMDMService`**
+- **Eliminated 24-second startup revalidation delay** — `SimpleMDMService` migrated from `ObservableObject`/`@Published` (46 properties) to the modern `@Observable` macro. With `ObservableObject`, every property change fires `objectWillChange` across all 30 subscriber views, causing full body re-evaluations of large views (DashboardView is 2598 lines). During startup revalidation, this kept the main actor occupied for up to 24 seconds, blocking the revalidation Task from starting. With `@Observable`, only views that read a specific property re-render when it changes. The `startCachedLaunchRevalidation` Task now starts within 1ms of being queued rather than waiting up to 24 seconds. Startup revalidation on a warm launch dropped from 24.6 seconds to 167ms.
+- **Inline device hydration** — Deferred device list hydration now runs inline before revalidation starts, guaranteeing devices are available to the list view immediately at ~160ms alongside the dashboard snapshot rather than waiting for the main actor to become free.
 
 ### 1.5.5 (Build 3)
 
