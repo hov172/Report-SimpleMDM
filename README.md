@@ -206,14 +206,16 @@ The dashboard is a substantial operational screen. It currently supports:
   - webhooks
   - push certificate
 
-When optional module data is available, the dashboard can also surface:
+When optional module data is available, the dashboard adds a labeled **MunkiReport Insights** section (a header with a MODULE tag and the configured server host) grouping the four module-only widgets:
 
 - sync health
 - compliance
-- assignment group distribution
-- resource type distribution
 - supplemental overview
 - AppleCare coverage
+
+The section renders only while module data is actually loading successfully — in API-only mode (or when the module connection is down) it disappears entirely, so the dashboard looks complete in every backend mode.
+
+Dual-source widgets stay in the main grid and switch data sources transparently: OS version breakdown, assignment group distribution, and resource type distribution show a small "via MunkiReport" caption when module data is feeding them, and fall back to direct SimpleMDM API data otherwise.
 
 Interactive navigation is wired into dashboard content. Examples:
 
@@ -780,7 +782,7 @@ Current settings coverage includes:
 - optional MunkiReport cookie
 - configurable module path prefix
 - configurable action names for lock, wipe, and sync
-- dashboard-widget visibility control
+- dashboard-widget visibility control, grouped by source (SimpleMDM API vs MunkiReport Module)
 - dashboard Action Items visibility control
 - optional Compact Dashboard Layout control
 - auto-hide control for the `Unenrolled` KPI when the count is zero
@@ -1013,7 +1015,7 @@ Recent summaries are stored locally and surfaced in Settings and dashboard sync-
 
 ### Connecting And Setup
 
-If you want supplemental MunkiReport enrichment, use `SimpleMDM + MunkiReport Module` in `Settings > Server & API`.
+If you want supplemental MunkiReport enrichment, use `SimpleMDM + MunkiReport Module` in `Settings > Server & API`. The server-side view of this setup (module requirements, curl verification, troubleshooting) is documented in the [SimpleMDM-MunkiReport README's "Connect ReportSimpleMDM" section](https://github.com/hov172/SimpleMDM-MunkiReport#connect-reportsimplemdm).
 
 Step by step:
 
@@ -1025,6 +1027,7 @@ Step by step:
    Example for non-rewrite routing: `https://munkireport.example.com/index.php?`
 5. Leave `Module Path Prefix` set to `/module/simplemdm` unless your MunkiReport deployment is intentionally customized.
 6. Choose one MunkiReport authentication method.
+   Sync-token auth (recommended, module `f8dd079` or later): leave `Auth Header Name` at its default `X-SIMPLEMDM-API-KEY` and leave `Auth Header Value` blank — the app sends your SimpleMDM API key automatically, and the module accepts it on its read-only dashboard routes. No auth configuration is needed for this path; a cleared header name resets to the default on next launch.
    Header-based auth: set `Auth Header Name` and `Auth Header Value` to whatever your MunkiReport deployment expects.
    Cookie-based auth: leave the auth-header fields blank and paste the full cookie value into `Cookie Header`.
 7. Save the configuration.
@@ -1036,8 +1039,8 @@ Quickest safe default:
 
 - `MunkiReport Base URL`: your MunkiReport root
 - `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: blank unless your MunkiReport deployment requires it
-- `Auth Header Value`: blank unless your MunkiReport deployment requires it
+- `Auth Header Name`: `X-SIMPLEMDM-API-KEY` (the default; sync-token auth requires module `f8dd079`+)
+- `Auth Header Value`: blank (the app substitutes your SimpleMDM API key)
 - `Cookie Header`: blank unless you are authenticating with a MunkiReport session cookie
 
 ## Quickstart
@@ -1316,12 +1319,28 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 
 ## Changelog And Release History
 
+### 1.6.2 (Build 7)
+
+**MunkiReport module connectivity fixed**
+- **Dashboard module routes renamed to match the server** — the nine module-backed dashboard reads used `simplemdm/data/*` route strings that never existed in the SimpleMDM MunkiReport module (and double-prefixed the configured `/module/simplemdm` path), so every module-mode dashboard read silently 404'd. They now call the module's real `get_*` endpoints, matching the already-correct `get_device_resources/{serial}` form.
+- **Sync telemetry reads the right module** — the sync-health card fetched a nonexistent `inventory/data/sync_health` route; it now uses the simplemdm module's `get_sync_telemetry`.
+- **Server counterpart (SimpleMDM-MunkiReport `f8dd079`)** — the module now accepts the app's `X-SIMPLEMDM-API-KEY` header on its ten read-only dashboard routes, so module-mode dashboards work without a MunkiReport browser session; the same module release fixes a memory-exhaustion 500 in `get_device_resources` on large fleets.
+- **Resource-type stats decode fixed** — `get_resource_type_stats` rows are keyed by `resource_type` rather than `label`; the shared stats model now accepts either key, clearing the "Decoding failed at Index 0.label" dashboard banner.
+- **`Auth Header Name` defaults to `X-SIMPLEMDM-API-KEY`** — empty stored values now reset to the default at launch, so the module connection needs zero auth configuration (the app substitutes the SimpleMDM API key when the header value is blank).
+- **Dashboard "MunkiReport Insights" section** — the four module-only widgets (Sync Health, Compliance, Supplemental Overview, AppleCare Coverage) are grouped under a labeled section that renders only when module data is available; dual-source widgets (OS Versions, Assignment Groups, Resource Types) stay in the main grid with a "via MunkiReport" caption when module data feeds them; the Customize sheet groups widgets by source.
+- **Action Item drill-downs for MunkiReport findings** — sync API errors open the actual error messages from the last sync run, noncompliant devices open a tappable reason breakdown, "below minimum OS" navigates to a new matching device filter, and command failures show per-device failure events fetched from the module's `get_events` route.
+- Direct SimpleMDM API mode is unaffected.
+
 ### 1.6.1 (Build 6)
 
 **Custom Configuration Profile API parity**
 - **Full create/update parameter parity** — the custom configuration profile editor now sends every parameter the SimpleMDM API supports, closing the gap left in 1.6.0: `auto_renew_scep_based_certificates`, `allowed_platforms[]` (macOS / iOS / iPadOS / tvOS), `minimum_macos_version`, `maximum_macos_version`, and `allowed_macos_architecture` (any / Intel x86 / Apple Silicon arm), alongside the existing scope/attribute/reinstall/declarative flags. Applies to both `POST /custom_configuration_profiles` and `PATCH /custom_configuration_profiles/{id}`.
 - **New "Platform Restrictions" editor card** with per-platform toggles, min/max macOS version fields, and an architecture picker; edit mode pre-fills from the existing profile.
 - **API-matching validation** — auto-renew SCEP is rejected (and auto-disabled in the UI) when Declarative is on, versions must be dotted-numeric, and maximum must be ≥ minimum (numeric compare, so `14.10 > 14.4`). Added `CustomConfigurationProfileInputTests`.
+
+**Packaging & distribution**
+- **Build number now actually reports Build 6** — `Config/Info.plist` had `CFBundleVersion` hardcoded to `3` (so Builds 4/5/6 all shipped as 3); it now uses `$(CURRENT_PROJECT_VERSION)`, matching how the short version uses `$(MARKETING_VERSION)`.
+- **App stapled for offline first launch** — the distributed `.app` is notarized and stapled in its own right (not just the DMG), so it passes Gatekeeper offline after being copied out of the DMG. Both app and DMG carry tickets; the release DMG was verified to download, mount, and launch cleanly.
 
 ### 1.6.0 (Build 5)
 
