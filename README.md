@@ -1319,6 +1319,23 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 
 ## Changelog And Release History
 
+### Unreleased
+
+### 1.7.2 (Build 10)
+
+**Device detail and MCP visibility**
+- Device detail now shows a compact MCP findings summary in the Overview tab and a badge in the device header when MunkiReport enrichment is configured. The full findings list is reachable from device detail, but MCP findings are hidden entirely when MunkiReport is not set up.
+- The MCP findings list now exposes a direct "Open Device" path when the serial resolves to a SimpleMDM device; unresolved serials continue to show the not-in-SimpleMDM note.
+- MunkiReport enrichment now uses the fixed `X-SIMPLEMDM-API-KEY` auth header name. The header name is no longer user-editable in the UI or settings flow.
+
+**Dashboard: MCP Findings widgets**
+- **MCP Findings card** — severity totals (danger/warning/info) plus the 5 most recent active findings (severity, category, serial) with a "+N more in MunkiReport" overflow line, fed by the module's token-readable `get_mcp_findings?limit=25` route.
+- **Findings Timeline card** — a 30-day New vs Resolved line chart (Swift Charts; New in the warning/orange color, Resolved in mint) fed by `get_mcp_finding_timeline?days=30`, with an empty state ("No findings activity in the last 30 days.") when there's nothing to show.
+- **Top Devices by Findings card** — a ranked list (max 10) of devices by weighted active-finding risk (score = 3×danger + 2×warning + 1×info) with per-severity count badges and the score, fed by `top_devices` in `get_mcp_finding_stats`.
+- All three render only inside MunkiReport Insights (hybrid-module mode, configured URL, and at least one module route returning data) and use the fixed `X-SIMPLEMDM-API-KEY` auth header when header auth is in use. Servers without the analytics routes (module older than the unreleased v1.3.0 line) or with MCP findings disabled return 404/403, so the affected card silently doesn't render — the rest of the section is unaffected.
+- New widget cases are default-enabled for fresh installs only; existing installs with a saved widget selection must enable "MCP Findings", "Findings Timeline", and "Top Devices by Findings" manually in Dashboard Widgets settings.
+- Added `McpFindingsTests` (3) and `McpAnalyticsTests` (4) — plain `JSONDecoder` decode tests.
+
 ### 1.6.2 (Build 7)
 
 **MunkiReport module connectivity fixed**
