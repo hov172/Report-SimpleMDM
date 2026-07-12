@@ -70,7 +70,7 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 
 ## What The App Can Do Today
 
-At a practical level, the current codebase supports all of the following:
+At a practical level, the product currently supports all of the following:
 
 - connect directly to SimpleMDM with a saved API key
 - save and switch between multiple SimpleMDM accounts without re-entering credentials
@@ -170,7 +170,7 @@ Current platform-specific behavior includes:
 - iOS local push notifications for script job completion
 - compact iPhone layouts for dashboard and inventory screens
 - macOS split-view device detail with a dedicated actions sidebar
-- visionOS shares the same SwiftUI codebase, with iOS-only behaviors compiled out where the platform does not support them
+- visionOS shares the same SwiftUI experience, with iOS-only behaviors compiled out where the platform does not support them
 - a common shared service layer and most shared management workflows across the supported platforms
 
 ## Detailed Capability Breakdown
@@ -492,7 +492,7 @@ The group detail screen also tracks local assignment state for:
 - assigned profile IDs
 - assigned device IDs
 
-This gives the UI fast feedback while still writing back through the service layer.
+This gives the UI fast feedback while still writing back through the shared service layer.
 
 ### 9. Apps And App Catalog
 
@@ -536,7 +536,7 @@ Current profile workflows include:
 - deploy profiles to device groups
 - manage assignment-group relationships for profiles
 
-The codebase distinguishes:
+The product distinguishes between:
 
 - `custom configuration profiles` — fully managed as native CRUD workflows
 - the broader live `profiles` endpoint — available as a browsable reference and deployment surface
@@ -698,7 +698,7 @@ From Settings → Saved Accounts:
 - save the current connection as a named account profile
 - the API key and MunkiReport credentials are stored per-account in the keychain using UUID-namespaced service strings
 - all non-secret connection metadata (backend mode, URLs, action names) is stored in UserDefaults
-- tap any saved account to switch to it — the service layer resets and reloads automatically
+- tap any saved account to switch to it — the shared service layer resets and reloads automatically
 - the active account is marked with a badge
 - swipe to delete removes the account profile and its keychain entries
 
@@ -831,7 +831,7 @@ Current permission behavior includes:
 
 ## Performance Characteristics
 
-The current codebase includes several non-trivial performance and reliability optimizations:
+The product includes several non-trivial performance and reliability optimizations:
 
 - paginated fleet loading
 - background continuation after the first page
@@ -844,7 +844,7 @@ The current codebase includes several non-trivial performance and reliability op
 - request throttling through a cancellation-safe concurrency limiter
 - refresh banners rather than hard UI resets during live reloads
 - sync-history retention capped to the most recent 100 syncs per host
-- `@Observable` granular invalidation — the service layer uses `@Observable` so only views that read a specific property re-render when it changes, eliminating the cascading full-view invalidation that `ObservableObject` caused on every state update
+- `@Observable` granular invalidation — the shared service layer uses `@Observable` so only views that read a specific property re-render when it changes, eliminating the cascading full-view invalidation that `ObservableObject` caused on every state update
 - inline device list hydration before revalidation starts, so the device list is always populated alongside the dashboard snapshot rather than waiting for background work to free the main actor
 
 The app also distinguishes between:
@@ -935,7 +935,7 @@ At a high level, the startup flow is:
 2. The app loads saved configuration from user defaults and keychain.
 3. The shared service layer is created and attached to the app environment.
 4. The app decides whether to show the setup screen or the main tab UI.
-5. The current settings are applied to the service layer.
+5. The current settings are applied to the shared service layer.
 6. The app waits briefly so the first frame can render cleanly.
 7. `ensureInitialLoad()` begins the initial data process.
 8. Deferred dashboard resources are scheduled after launch.
@@ -1402,8 +1402,8 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 - **Accurate `totalMs` in deferred hydration log** — The original startup timestamp is now threaded through the full deferred-hydration call chain so the "first publish" log line reflects true wall-clock time from app launch rather than always showing 0ms.
 - **Named publish sources** — Every device-list publish now carries a descriptive source label in the startup timing log (`sync_page`, `query_page`, `load_more`, `startup_page`, `bg_sync_page`, `bg_sync_complete`) instead of `unspecified`.
 
-- **Performance — `@Observable` migration for the service layer**
-- **Eliminated 24-second startup revalidation delay** — the service layer migrated from `ObservableObject`/`@Published` to the modern `@Observable` macro. With `ObservableObject`, every property change fires `objectWillChange` across all subscriber views, causing full body re-evaluations of large views. During startup revalidation, this kept the main actor occupied for up to 24 seconds, blocking the revalidation task from starting. With `@Observable`, only views that read a specific property re-render when it changes. Startup revalidation on a warm launch dropped from 24.6 seconds to 167ms.
+**Performance — `@Observable` migration for the shared service layer**
+- **Eliminated 24-second startup revalidation delay** — the shared service layer migrated from `ObservableObject`/`@Published` to the modern `@Observable` macro. With `ObservableObject`, every property change fires `objectWillChange` across all subscriber views, causing full body re-evaluations of large views. During startup revalidation, this kept the main actor occupied for up to 24 seconds, blocking the revalidation task from starting. With `@Observable`, only views that read a specific property re-render when it changes. Startup revalidation on a warm launch dropped from 24.6 seconds to 167ms.
 - **Inline device hydration** — Deferred device list hydration now runs inline before revalidation starts, guaranteeing devices are available to the list view immediately at ~160ms alongside the dashboard snapshot rather than waiting for the main actor to become free.
 
 ### 1.5.5 (Build 3)
