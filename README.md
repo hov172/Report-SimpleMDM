@@ -1,10 +1,10 @@
 # ReportSimpleMDM
 
-ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS and iOS. It gives admins a fast, operator-focused view of fleet state while exposing the full SimpleMDM API surface through native workflows, bulk operations, an API catalog, and runnable endpoint presets.
+ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS, iOS, iPadOS, and visionOS. It gives admins a fast, operator-focused view of fleet state while exposing the full SimpleMDM API surface through native workflows, bulk operations, an API catalog, and runnable endpoint presets.
 
 The app is designed first as a standalone SimpleMDM operations client. Optional MunkiReport enrichment is supported but additive rather than foundational.
 
-# Contact me if you want to be added to IOS and Android version of the App testing group.
+# Contact me if you want to be added to the app testing group.
 
 ---
 ## 🌐 Connect With Me
@@ -162,7 +162,7 @@ The current persistence model includes cached fleet data, launch snapshots, reso
 
 ## Platform Support
 
-The project is a shared SwiftUI app for macOS and iOS.
+The project is a shared SwiftUI app for Apple platforms.
 
 Current platform-specific behavior includes:
 
@@ -170,7 +170,8 @@ Current platform-specific behavior includes:
 - iOS local push notifications for script job completion
 - compact iPhone layouts for dashboard and inventory screens
 - macOS split-view device detail with a dedicated actions sidebar
-- a common shared service layer and most shared management workflows across both platforms
+- visionOS shares the same SwiftUI codebase, with iOS-only behaviors compiled out where the platform does not support them
+- a common shared service layer and most shared management workflows across the supported platforms
 
 ## Detailed Capability Breakdown
 
@@ -843,7 +844,7 @@ The current codebase includes several non-trivial performance and reliability op
 - request throttling through a cancellation-safe concurrency limiter
 - refresh banners rather than hard UI resets during live reloads
 - sync-history retention capped to the most recent 100 syncs per host
-- `@Observable` granular invalidation — `SimpleMDMService` uses `@Observable` so only views that read a specific property re-render when it changes, eliminating the cascading full-view invalidation that `ObservableObject` caused on every state update
+- `@Observable` granular invalidation — the service layer uses `@Observable` so only views that read a specific property re-render when it changes, eliminating the cascading full-view invalidation that `ObservableObject` caused on every state update
 - inline device list hydration before revalidation starts, so the device list is always populated alongside the dashboard snapshot rather than waiting for background work to free the main actor
 
 The app also distinguishes between:
@@ -1045,7 +1046,7 @@ Quickest safe default:
 
 ## Quickstart
 
-1. Build and run the app on macOS or iOS.
+1. Build and run the app on macOS, iOS, iPadOS, or visionOS.
 2. On first launch, enter your SimpleMDM API key when prompted.
 3. The app saves the key to the keychain and loads the fleet.
 4. Use the `Devices` tab to browse and filter your fleet.
@@ -1251,7 +1252,7 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 └─────────────────────┬───────────────────────────────┘
                       │ @Environment
 ┌─────────────────────▼───────────────────────────────┐
-│                 SimpleMDMService                      │
+│                 Service Layer                         │
 │  @Observable @MainActor                               │
 │  ┌─────────────────┐  ┌────────────────────────────┐ │
 │  │ ResourceCatalog │  │ Observed device/UI state   │ │
@@ -1356,7 +1357,7 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 - **API-matching validation** — auto-renew SCEP is rejected (and auto-disabled in the UI) when Declarative is on, versions must be dotted-numeric, and maximum must be ≥ minimum (numeric compare, so `14.10 > 14.4`). Added `CustomConfigurationProfileInputTests`.
 
 **Packaging & distribution**
-- **Build number now actually reports Build 6** — `Config/Info.plist` had `CFBundleVersion` hardcoded to `3` (so Builds 4/5/6 all shipped as 3); it now uses `$(CURRENT_PROJECT_VERSION)`, matching how the short version uses `$(MARKETING_VERSION)`.
+- **Build number now actually reports Build 6** — the app bundle version metadata had `CFBundleVersion` hardcoded to `3` (so Builds 4/5/6 all shipped as 3); it now uses the current project version, matching how the short version uses the marketing version.
 - **App stapled for offline first launch** — the distributed `.app` is notarized and stapled in its own right (not just the DMG), so it passes Gatekeeper offline after being copied out of the DMG. Both app and DMG carry tickets; the release DMG was verified to download, mount, and launch cleanly.
 
 ### 1.6.0 (Build 5)
@@ -1387,22 +1388,22 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 - **Script job watcher** — `watchScriptJobForCompletion` now propagates `CancellationError` from `Task.sleep` so the poll loop exits immediately on cancellation rather than ignoring it.
 - **Modern CPU offloading** — `sortedDevices` and `buildDashboardSnapshot` are now `@concurrent nonisolated` async functions. All four `Task.detached { }.value` sort/snapshot sites are replaced with direct `await` calls, expressing off-actor intent at the declaration rather than every call site.
 - **Background decoding** — `decodeInBackground` is now `@concurrent`, removing the nested `Task.detached` wrapper.
-- **Removed redundant main-actor hops** — Eliminated two unnecessary `await MainActor.run {}` calls in `DeviceDetailView` that were no-ops (already on the main actor inside a `Task {}` from a `@MainActor` view).
+- **Removed redundant main-actor hops** — Eliminated two unnecessary `await MainActor.run {}` calls in device detail that were no-ops because the work was already on the main actor.
 
 **SwiftUI modernisation**
-- **`@Observable` navigation state** — `AppNavigationState` migrated from `ObservableObject`/`@Published`/`@StateObject`/`@EnvironmentObject` to `@Observable @MainActor`. Views now receive per-property change notifications instead of full-view invalidation on any state change. `AppTab` and `DevicePostureFilter` moved to dedicated files.
+- **`@Observable` navigation state** — navigation state migrated from `ObservableObject`/`@Published`/`@StateObject`/`@EnvironmentObject` to `@Observable @MainActor`. Views now receive per-property change notifications instead of full-view invalidation on any state change.
 - **`foregroundStyle` everywhere** — Replaced all deprecated `.foregroundColor()` calls with `.foregroundStyle()` across 38 view files.
-- **`clipShape` everywhere** — Replaced all deprecated `.cornerRadius()` calls with `.clipShape(.rect(cornerRadius:))` in `DashboardView`, `DeviceListView`, and `GlassTextField`.
-- **`scrollIndicators` modernised** — Replaced deprecated `showsIndicators:` initializer parameter with `.scrollIndicators()` modifier in `DeviceListView` and `MunkiPkginfoView`.
+- **`clipShape` everywhere** — Replaced all deprecated `.cornerRadius()` calls with `.clipShape(.rect(cornerRadius:))` across the dashboard, inventory, and related glass-style text fields.
+- **`scrollIndicators` modernised** — Replaced the deprecated `showsIndicators:` initializer parameter with `.scrollIndicators()` on the inventory and package-info views.
 - **Account switcher accessibility** — `onTapGesture` in `AccountSwitcherView` replaced with `Button`, making account rows accessible to VoiceOver and Voice Control.
-- **Automatic task cancellation** — `Task {}` inside `DeviceListView.onAppear` for device hydration replaced with `.task {}` modifier so the work is automatically cancelled if the view disappears before it completes.
+- **Automatic task cancellation** — `Task {}` inside the inventory screen's appearance flow for device hydration was replaced with `.task {}` so the work is automatically cancelled if the view disappears before it completes.
 
 **Startup diagnostics**
 - **Accurate `totalMs` in deferred hydration log** — The original startup timestamp is now threaded through the full deferred-hydration call chain so the "first publish" log line reflects true wall-clock time from app launch rather than always showing 0ms.
 - **Named publish sources** — Every device-list publish now carries a descriptive source label in the startup timing log (`sync_page`, `query_page`, `load_more`, `startup_page`, `bg_sync_page`, `bg_sync_complete`) instead of `unspecified`.
 
-**Performance — `@Observable` migration for `SimpleMDMService`**
-- **Eliminated 24-second startup revalidation delay** — `SimpleMDMService` migrated from `ObservableObject`/`@Published` (46 properties) to the modern `@Observable` macro. With `ObservableObject`, every property change fires `objectWillChange` across all 30 subscriber views, causing full body re-evaluations of large views (DashboardView is 2598 lines). During startup revalidation, this kept the main actor occupied for up to 24 seconds, blocking the revalidation Task from starting. With `@Observable`, only views that read a specific property re-render when it changes. The `startCachedLaunchRevalidation` Task now starts within 1ms of being queued rather than waiting up to 24 seconds. Startup revalidation on a warm launch dropped from 24.6 seconds to 167ms.
+- **Performance — `@Observable` migration for the service layer**
+- **Eliminated 24-second startup revalidation delay** — the service layer migrated from `ObservableObject`/`@Published` to the modern `@Observable` macro. With `ObservableObject`, every property change fires `objectWillChange` across all subscriber views, causing full body re-evaluations of large views. During startup revalidation, this kept the main actor occupied for up to 24 seconds, blocking the revalidation task from starting. With `@Observable`, only views that read a specific property re-render when it changes. Startup revalidation on a warm launch dropped from 24.6 seconds to 167ms.
 - **Inline device hydration** — Deferred device list hydration now runs inline before revalidation starts, guaranteeing devices are available to the list view immediately at ~160ms alongside the dashboard snapshot rather than waiting for the main actor to become free.
 
 ### 1.5.5 (Build 3)
@@ -1512,7 +1513,7 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 
 ## Bottom Line
 
-ReportSimpleMDM implements the full SimpleMDM API v1.55 surface across a native SwiftUI app for macOS and iOS. Every PRD-defined requirement is implemented, including multi-account support, bulk operations, custom attribute management, webhook CRUD, script job notifications, dynamic group display, Munki pkginfo, account log browsing, and push certificate expiry monitoring.
+ReportSimpleMDM implements the full SimpleMDM API v1.55 surface across a native SwiftUI app for macOS, iOS, iPadOS, and visionOS. Every PRD-defined requirement is implemented, including multi-account support, bulk operations, custom attribute management, webhook CRUD, script job notifications, dynamic group display, Munki pkginfo, account log browsing, and push certificate expiry monitoring.
 
 The app is production-ready for SimpleMDM fleet operators who want a native, fast, full-featured alternative to the SimpleMDM web console.
 
