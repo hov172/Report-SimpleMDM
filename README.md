@@ -1327,6 +1327,11 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 
 - **DEP token status visibility** — the dashboard now shows DEP server token status buckets (valid / expiring soon / expired / missing), adds a conditional token-expiry action item, and surfaces token-expiry fields in DEP server detail.
 
+### 1.7.2 (Build 11)
+
+**DEP token status visibility**
+- The dashboard now shows DEP server token status buckets (valid / expiring soon / expired / missing), adds a conditional token-expiry action item, and surfaces token-expiry fields in DEP server detail.
+
 ### 1.7.2 (Build 10)
 
 **Device detail and MCP visibility**
