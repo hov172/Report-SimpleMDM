@@ -86,6 +86,7 @@ At a practical level, the product currently supports all of the following:
 - execute common and advanced device actions
 - view the push certificate expiry date and see a prominent warning banner when it is within 30 days
 - review dashboard Action Items and customize which triage signals are shown
+- show a DEP server token status card on the dashboard with valid / expiring soon / expired / missing buckets, plus a conditional token-expiry action item and DEP server detail expiry fields
 - create and manage assignment groups, including viewing filter criteria for dynamic groups
 - set custom attribute values on assignment groups
 - create and manage app catalog entries, including viewing and deleting Munki pkginfo
@@ -621,6 +622,7 @@ Current DEP workflows include:
 - inspect summary metadata
 - trigger `sync with Apple`
 - load and inspect DEP devices for a server
+- view DEP server token status and token-expiry detail
 
 ### 16. Push Certificate Management
 
@@ -1322,6 +1324,8 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 ## Changelog And Release History
 
 ### Unreleased
+
+- **DEP token status visibility** — the dashboard now shows DEP server token status buckets (valid / expiring soon / expired / missing), adds a conditional token-expiry action item, and surfaces token-expiry fields in DEP server detail.
 
 ### 1.7.2 (Build 10)
 
