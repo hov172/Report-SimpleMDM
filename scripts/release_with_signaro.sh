@@ -127,15 +127,9 @@ command -v gh >/dev/null 2>&1 || {
 }
 
 release_root="${output_root:-$(mktemp -d /private/tmp/ReportSimpleMDM-release.XXXXXX)}"
-stage_root="$release_root/stage"
-mkdir -p "$stage_root"
-
-staged_app="$stage_root/$(basename "$app_path")"
-rm -rf "$staged_app"
-ditto "$app_path" "$staged_app"
-
+mkdir -p "$release_root"
 SignaroCLI distribute app \
-  --app "$staged_app" \
+  --app "$app_path" \
   --identity-name "$signing_identity" \
   --keychain-profile "$keychain_profile" \
   --output-dir "$release_root"
