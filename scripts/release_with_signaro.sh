@@ -3,12 +3,11 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: release_with_signaro.sh --tag <release-tag> [options]
-
-Required:
-  --tag <tag>                Git tag / release tag to publish, e.g. v1.7.2-build12
+Usage: release_with_signaro.sh [options]
 
 Optional:
+  --tag <tag>                Override the derived Git tag, e.g. v1.7.2-build12
+  --title <text>             Override the derived GitHub release title
   --app <path>               Input .app bundle to sign and distribute
                              Default: /Users/helpdesk/Developer/Apps/ReportSimpleMDM.app
   --keychain-profile <name>  Signaro notarization profile
@@ -19,7 +18,6 @@ Optional:
                              Default: hov172/ReportSimpleMDM
   --mirror-repo <owner/name> Secondary GitHub repo to mirror to
                              Default: hov172/Report-SimpleMDM
-  --title <text>             GitHub release title used if the release does not exist yet
   --notes <text>             GitHub release notes used if the release does not exist yet
   --output-root <path>       Directory for staging and generated assets
                              Default: a temp directory under /private/tmp
@@ -30,14 +28,16 @@ EOF
 }
 
 tag=""
+release_title=""
 app_path="/Users/helpdesk/Developer/Apps/ReportSimpleMDM.app"
 keychain_profile="Jay_SIGNARO"
 signing_identity="Developer ID Application: Jesus Ayala (N859JA9UCJ)"
 primary_repo="hov172/ReportSimpleMDM"
 mirror_repo="hov172/Report-SimpleMDM"
-release_title=""
 release_notes=""
 output_root=""
+project_path=""
+scheme="ReportSimpleMDM"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -90,9 +90,26 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$tag" ]]; then
-  printf 'Missing required --tag.\n' >&2
-  usage >&2
-  exit 64
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  repo_root="$(cd "$script_dir/.." && pwd)"
+  project_path="$repo_root/ReportSimpleMDM.xcodeproj"
+  if [[ ! -d "$project_path" ]]; then
+    printf 'Xcode project not found: %s\n' "$project_path" >&2
+    exit 66
+  fi
+
+  build_settings="$(xcodebuild -project "$project_path" -scheme "$scheme" -configuration Release -showBuildSettings 2>/dev/null)"
+  marketing_version="$(printf '%s\n' "$build_settings" | awk -F' = ' '/ MARKETING_VERSION = / {gsub(";", "", $2); print $2; exit}')"
+  project_version="$(printf '%s\n' "$build_settings" | awk -F' = ' '/ CURRENT_PROJECT_VERSION = / {gsub(";", "", $2); print $2; exit}')"
+  product_name="$(printf '%s\n' "$build_settings" | awk -F' = ' '/ PRODUCT_NAME = / {gsub(";", "", $2); print $2; exit}')"
+
+  if [[ -z "${marketing_version:-}" || -z "${project_version:-}" ]]; then
+    printf 'Failed to derive build settings from %s\n' "$project_path" >&2
+    exit 70
+  fi
+
+  tag="v${marketing_version}-build${project_version}"
+  release_title="${release_title:-${product_name:-ReportSimpleMDM} v${marketing_version} (Build ${project_version})}"
 fi
 
 if [[ ! -d "$app_path" ]]; then
