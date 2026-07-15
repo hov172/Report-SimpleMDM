@@ -25,8 +25,7 @@ Optional:
                              Default: a temp directory under /private/tmp
 
 The script stages the input app, runs SignaroCLI distribute app to sign/notarize/
-staple it and create a DMG, then uploads a zip of the signed app bundle plus the
-DMG to the requested GitHub release(s).
+staple it and create a DMG, then uploads the DMG to the requested GitHub release(s).
 EOF
 }
 
@@ -130,21 +129,16 @@ if [[ -z "${dmg_path:-}" ]]; then
   exit 70
 fi
 
-asset_base="ReportSimpleMDM-${tag}"
-app_zip="$release_root/${asset_base}.app.zip"
-rm -f "$app_zip"
-ditto -c -k --keepParent "$staged_app" "$app_zip"
-
 publish_release() {
   local repo="$1"
   if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
-    gh release upload "$tag" "$app_zip" "$dmg_path" --repo "$repo" --clobber
+    gh release upload "$tag" "$dmg_path" --repo "$repo" --clobber
   else
     local title="${release_title:-ReportSimpleMDM ${tag}}"
     if [[ -n "$release_notes" ]]; then
-      gh release create "$tag" "$app_zip" "$dmg_path" --repo "$repo" --title "$title" --notes "$release_notes"
+      gh release create "$tag" "$dmg_path" --repo "$repo" --title "$title" --notes "$release_notes"
     else
-      gh release create "$tag" "$app_zip" "$dmg_path" --repo "$repo" --title "$title" --notes "Automated release for ${tag}."
+      gh release create "$tag" "$dmg_path" --repo "$repo" --title "$title" --notes "Automated release for ${tag}."
     fi
   fi
 }
@@ -155,8 +149,7 @@ if [[ -n "$mirror_repo" ]]; then
   publish_release "$mirror_repo"
 fi
 
-printf 'Published %s and %s to %s%s\n' \
-  "$app_zip" \
+printf 'Published %s to %s%s\n' \
   "$dmg_path" \
   "$primary_repo" \
   "${mirror_repo:+ and $mirror_repo}"
