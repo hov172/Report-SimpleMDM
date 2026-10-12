@@ -4,8 +4,10 @@ ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS, iOS
 
 The app is designed first as a standalone SimpleMDM operations client. Optional MunkiReport enrichment is supported but additive rather than foundational.
 
-# Contact me if you want to be added to the app testing group. 
--- For iOS and Android
+## Download
+
+- **iOS (TestFlight):** [Join the public beta](https://testflight.apple.com/join/JMh5jvXY)
+- **macOS:** notarized DMG on the [Releases page](https://github.com/hov172/Report-SimpleMDM/releases/latest)
 
 ---
 ## 🌐 Connect With Me
