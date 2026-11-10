@@ -1,4 +1,4 @@
-# ReportSimpleMDM
+# <img src="Images/app-icon.png" width="48" align="top" alt=""> ReportSimpleMDM
 
 ReportSimpleMDM is a native SwiftUI client for SimpleMDM that runs on macOS, iOS, iPadOS, and visionOS. It gives admins a fast, operator-focused view of fleet state while exposing the full SimpleMDM API surface through native workflows, bulk operations, an API catalog, and runnable endpoint presets.
 
