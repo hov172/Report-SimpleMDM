@@ -73,7 +73,7 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 
 ## What The App Can Do Today
 
-At a practical level, the product currently supports all of the following:
+At a practical level, the current codebase supports all of the following:
 
 - connect directly to SimpleMDM with a saved API key
 - save and switch between multiple SimpleMDM accounts without re-entering credentials
@@ -86,9 +86,9 @@ At a practical level, the product currently supports all of the following:
 - view and inline-edit custom attribute values per device
 - run scripts on a specific device and receive a local notification when the job completes
 - execute common and advanced device actions
+- summarize DEP server token status on the dashboard and surface a token-expiry action item when renewal is needed
 - view the push certificate expiry date and see a prominent warning banner when it is within 30 days
 - review dashboard Action Items and customize which triage signals are shown
-- show a DEP server token status card on the dashboard with valid / expiring soon / expired / missing buckets, plus a conditional token-expiry action item and DEP server detail expiry fields
 - create and manage assignment groups, including viewing filter criteria for dynamic groups
 - set custom attribute values on assignment groups
 - create and manage app catalog entries, including viewing and deleting Munki pkginfo
@@ -174,7 +174,7 @@ Current platform-specific behavior includes:
 - iOS local push notifications for script job completion
 - compact iPhone layouts for dashboard and inventory screens
 - macOS split-view device detail with a dedicated actions sidebar
-- visionOS shares the same SwiftUI experience, with iOS-only behaviors compiled out where the platform does not support them
+- visionOS shares the same SwiftUI codebase, with iOS-only behaviors compiled out where the platform does not support them
 - a common shared service layer and most shared management workflows across the supported platforms
 
 ## Detailed Capability Breakdown
@@ -211,14 +211,17 @@ The dashboard is a substantial operational screen. It currently supports:
   - webhooks
   - push certificate
 
-When optional module data is available, the dashboard adds a labeled **MunkiReport Insights** section (a header with a MODULE tag and the configured server host) grouping the four module-only widgets:
+When optional module data is available, the dashboard adds a labeled **MunkiReport Insights** section (a header with a MODULE tag and the configured server host) grouping the module-only widgets:
 
 - sync health
 - compliance
 - supplemental overview
 - AppleCare coverage
+- MCP Findings — severity totals (danger/warning/info) plus the 5 most recent active findings (severity, category, serial), with a "+N more in MunkiReport" overflow line, fed by the module's token-readable `get_mcp_findings?limit=25` route
+- Findings Timeline — a 30-day New vs Resolved line chart (Swift Charts; New in the warning/orange color, Resolved in mint), fed by `get_mcp_finding_timeline?days=30`, with an empty state ("No findings activity in the last 30 days.") when there's nothing to show
+- Top Devices by Findings — a ranked list (max 10) of devices by weighted active-finding risk (score = 3×danger + 2×warning + 1×info) with per-severity count badges and the score, fed by `top_devices` in `get_mcp_finding_stats`
 
-The section renders only while module data is actually loading successfully — in API-only mode (or when the module connection is down) it disappears entirely, so the dashboard looks complete in every backend mode.
+The section renders only while module data is actually loading successfully — in API-only mode (or when the module connection is down) it disappears entirely, so the dashboard looks complete in every backend mode. The three findings cards additionally need a MunkiReport module release with the analytics routes above (beyond the current documented module baseline, on the unreleased v1.3.0 line); on older modules, or when MCP findings are disabled server-side, those routes 404/403 and the affected card simply doesn't render — the rest of the section is unaffected. All module widgets, including the findings cards, use the fixed `X-SIMPLEMDM-API-KEY` auth header when header auth is in use; no MunkiReport browser session is needed.
 
 Dual-source widgets stay in the main grid and switch data sources transparently: OS version breakdown, assignment group distribution, and resource type distribution show a small "via MunkiReport" caption when module data is feeding them, and fall back to direct SimpleMDM API data otherwise.
 
@@ -323,6 +326,7 @@ The overview and inventory flows expose:
 - assignment group and device group context
 - synced subresource summaries
 - full inventory fields
+- an opt-in Device Secrets card on the Inventory tab (FileVault recovery key, firmware and recovery lock passwords, Activation Lock bypass codes, admin passwords, Lock & Erase PINs), masked by default with per-row reveal and copy; shown only when `Show Device Secrets` is enabled
 
 #### Custom Attributes Tab
 
@@ -360,7 +364,7 @@ Subresource UI includes:
 - device log fetches using device-specific lookup
 - log-detail fetches for individual log records
 
-When MunkiReport enrichment is configured, device detail can also show connected-resource summaries for supplemental module-backed context.
+When MunkiReport enrichment is configured, device detail can show connected-resource summaries and MCP findings summaries for supplemental module-backed context. MCP findings are not shown when MunkiReport is not configured.
 
 ### 5. Installed Apps
 
@@ -488,7 +492,7 @@ Dynamic group membership is computed by SimpleMDM and cannot be edited directly.
 
 #### Custom Attributes On Groups
 
-The group detail screen includes a Custom Attributes section listing all attribute definitions in the account. Each row shows a text field for the value and a Save button that writes the value to `POST /assignment_groups/{id}/custom_attributes/{key}`.
+The group detail screen includes a Custom Attributes section listing all attribute definitions in the account. Each row shows a text field for the value and a Save button that writes the value to `PUT /assignment_groups/{id}/custom_attribute_values/{key}`.
 
 The group detail screen also tracks local assignment state for:
 
@@ -496,7 +500,7 @@ The group detail screen also tracks local assignment state for:
 - assigned profile IDs
 - assigned device IDs
 
-This gives the UI fast feedback while still writing back through the shared service layer.
+This gives the UI fast feedback while still writing back through the service layer.
 
 ### 9. Apps And App Catalog
 
@@ -540,7 +544,7 @@ Current profile workflows include:
 - deploy profiles to device groups
 - manage assignment-group relationships for profiles
 
-The product distinguishes between:
+The codebase distinguishes:
 
 - `custom configuration profiles` — fully managed as native CRUD workflows
 - the broader live `profiles` endpoint — available as a browsable reference and deployment surface
@@ -552,7 +556,7 @@ Custom declarations are a native feature area.
 Current declaration workflows include:
 
 - list declarations
-- inspect declaration details
+- inspect declaration details, including the Payload UUID used to reference `com.apple.asset.*` declarations
 - download declaration payloads
 - inspect payload content in-app
 - create declarations
@@ -581,13 +585,13 @@ The device detail Attributes tab allows:
 
 - viewing the current value of every attribute on a device
 - editing any value inline
-- saving individual values independently via `POST /devices/{id}/custom_attributes/{key}`
+- saving individual values independently via `PUT /devices/{id}/custom_attribute_values/{key}`
 
 #### Per-Group Values
 
 The assignment group detail screen Custom Attributes section allows:
 
-- setting any attribute value on the group via `POST /assignment_groups/{id}/custom_attributes/{key}`
+- setting any attribute value on the group via `PUT /assignment_groups/{id}/custom_attribute_values/{key}`
 
 ### 13. Managed App Configs
 
@@ -622,9 +626,9 @@ Current DEP workflows include:
 
 - list registered DEP servers
 - inspect summary metadata
+- view token status and expiry details for each DEP server
 - trigger `sync with Apple`
 - load and inspect DEP devices for a server
-- view DEP server token status and token-expiry detail
 
 ### 16. Push Certificate Management
 
@@ -703,7 +707,7 @@ From Settings → Saved Accounts:
 - save the current connection as a named account profile
 - the API key and MunkiReport credentials are stored per-account in the keychain using UUID-namespaced service strings
 - all non-secret connection metadata (backend mode, URLs, action names) is stored in UserDefaults
-- tap any saved account to switch to it — the shared service layer resets and reloads automatically
+- tap any saved account to switch to it — the service layer resets and reloads automatically
 - the active account is marked with a badge
 - swipe to delete removes the account profile and its keychain entries
 
@@ -788,7 +792,7 @@ Current settings coverage includes:
 - optional MunkiReport cookie
 - configurable module path prefix
 - configurable action names for lock, wipe, and sync
-- dashboard-widget visibility control, grouped by source (SimpleMDM API vs MunkiReport Module)
+- dashboard-widget visibility control, grouped by source (SimpleMDM API vs MunkiReport Module) — new widget cases (MCP Findings, Findings Timeline, Top Devices by Findings) are default-enabled for fresh installs only; existing installs with a saved widget selection must enable them manually
 - dashboard Action Items visibility control
 - optional Compact Dashboard Layout control
 - auto-hide control for the `Unenrolled` KPI when the count is zero
@@ -803,6 +807,7 @@ Current settings coverage includes:
   - custom configuration profiles
 - bundle version and build visibility
 - debug logging toggle for full fleet sync pagination
+- `Show Device Secrets` toggle — sends `show_secrets=true` on Devices API requests; requires the `Device Secrets` API key permission
 - `Clear Saved Connection`
 
 Account-level settings:
@@ -827,6 +832,7 @@ The code explicitly models these permission domains:
 - `Profiles: write`
 - `Apps: write`
 - `Managed App Configs: write`
+- `Device Secrets` (only when `Show Device Secrets` is enabled)
 
 Current permission behavior includes:
 
@@ -836,7 +842,7 @@ Current permission behavior includes:
 
 ## Performance Characteristics
 
-The product includes several non-trivial performance and reliability optimizations:
+The current codebase includes several non-trivial performance and reliability optimizations:
 
 - paginated fleet loading
 - background continuation after the first page
@@ -849,7 +855,7 @@ The product includes several non-trivial performance and reliability optimizatio
 - request throttling through a cancellation-safe concurrency limiter
 - refresh banners rather than hard UI resets during live reloads
 - sync-history retention capped to the most recent 100 syncs per host
-- `@Observable` granular invalidation — the shared service layer uses `@Observable` so only views that read a specific property re-render when it changes, eliminating the cascading full-view invalidation that `ObservableObject` caused on every state update
+- `@Observable` granular invalidation — `SimpleMDMService` uses `@Observable` so only views that read a specific property re-render when it changes, eliminating the cascading full-view invalidation that `ObservableObject` caused on every state update
 - inline device list hydration before revalidation starts, so the device list is always populated alongside the dashboard snapshot rather than waiting for background work to free the main actor
 
 The app also distinguishes between:
@@ -940,7 +946,7 @@ At a high level, the startup flow is:
 2. The app loads saved configuration from user defaults and keychain.
 3. The shared service layer is created and attached to the app environment.
 4. The app decides whether to show the setup screen or the main tab UI.
-5. The current settings are applied to the shared service layer.
+5. The current settings are applied to the service layer.
 6. The app waits briefly so the first frame can render cleanly.
 7. `ensureInitialLoad()` begins the initial data process.
 8. Deferred dashboard resources are scheduled after launch.
@@ -1033,8 +1039,8 @@ Step by step:
    Example for non-rewrite routing: `https://munkireport.example.com/index.php?`
 5. Leave `Module Path Prefix` set to `/module/simplemdm` unless your MunkiReport deployment is intentionally customized.
 6. Choose one MunkiReport authentication method.
-   Sync-token auth (recommended, module `f8dd079` or later): leave `Auth Header Name` at its default `X-SIMPLEMDM-API-KEY` and leave `Auth Header Value` blank — the app sends your SimpleMDM API key automatically, and the module accepts it on its read-only dashboard routes. No auth configuration is needed for this path; a cleared header name resets to the default on next launch.
-   Header-based auth: set `Auth Header Name` and `Auth Header Value` to whatever your MunkiReport deployment expects.
+   Sync-token auth (recommended, module `f8dd079` or later): `Auth Header Name` is fixed to `X-SIMPLEMDM-API-KEY` and `Auth Header Value` can stay blank — the app sends your SimpleMDM API key automatically, and the module accepts it on its read-only dashboard routes. No auth header-name configuration is needed for this path.
+   Header-based auth: keep the fixed `X-SIMPLEMDM-API-KEY` header name and set `Auth Header Value` to whatever your MunkiReport deployment expects.
    Cookie-based auth: leave the auth-header fields blank and paste the full cookie value into `Cookie Header`.
 7. Save the configuration.
 8. Return to the dashboard or settings screens and let the app refresh.
@@ -1045,7 +1051,7 @@ Quickest safe default:
 
 - `MunkiReport Base URL`: your MunkiReport root
 - `Module Path Prefix`: `/module/simplemdm`
-- `Auth Header Name`: `X-SIMPLEMDM-API-KEY` (the default; sync-token auth requires module `f8dd079`+)
+- `Auth Header Name`: fixed to `X-SIMPLEMDM-API-KEY` (sync-token auth requires module `f8dd079`+)
 - `Auth Header Value`: blank (the app substitutes your SimpleMDM API key)
 - `Cookie Header`: blank unless you are authenticating with a MunkiReport session cookie
 
@@ -1088,7 +1094,7 @@ Use `Settings > Saved Accounts` to register each SimpleMDM API key as a named ac
 | Device inventory | SimpleMDM `GET /devices` |
 | Device detail | SimpleMDM `GET /devices/{id}` |
 | Device actions | SimpleMDM device action endpoints |
-| Custom attributes per device | SimpleMDM `GET/POST /devices/{id}/custom_attributes/{key}` |
+| Custom attributes per device | SimpleMDM `GET /devices/{id}/custom_attribute_values`, `PUT /devices/{id}/custom_attribute_values/{key}` |
 | Script jobs | SimpleMDM `GET/POST/DELETE /script_jobs` |
 | Job notifications | Local UNUserNotificationCenter after polling `GET /script_jobs/{id}` |
 | Assignment groups | SimpleMDM `GET/POST/PATCH/DELETE /assignment_groups` |
@@ -1161,6 +1167,7 @@ Use `Settings > Saved Accounts` to register each SimpleMDM API key as a named ac
 | Deploy profiles | Profiles: write |
 | Manage app catalog | Apps: write |
 | Manage app configs | Managed App Configs: write |
+| View device secrets (`Show Device Secrets` on) | Device Secrets |
 
 ## Endpoint Appendix
 
@@ -1173,7 +1180,7 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 - `/assignment_groups` — GET, POST, PATCH, DELETE
 - `/assignment_groups/{id}/apps/{id}` — POST, DELETE
 - `/assignment_groups/{id}/clone` — POST
-- `/assignment_groups/{id}/custom_attributes/{key}` — POST
+- `/assignment_groups/{id}/custom_attribute_values/{key}` — PUT
 - `/assignment_groups/{id}/devices/{id}` — POST, DELETE
 - `/assignment_groups/{id}/profiles/{id}` — POST, DELETE
 - `/assignment_groups/{id}/push_apps` — POST
@@ -1188,9 +1195,9 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 - `/dep_servers` — GET
 - `/dep_servers/{id}/dep_devices` — GET
 - `/dep_servers/{id}/sync` — POST
-- `/devices` — GET, POST, PATCH, DELETE
-- `/devices/{id}/custom_attributes` — GET
-- `/devices/{id}/custom_attributes/{key}` — POST
+- `/devices` — GET, POST, PATCH, DELETE (`?show_secrets=true` on GET when `Show Device Secrets` is enabled)
+- `/devices/{id}/custom_attribute_values` — GET
+- `/devices/{id}/custom_attribute_values/{key}` — PUT
 - `/devices/{id}/installed_apps` — GET
 - `/devices/{id}/installed_apps/{id}` — GET, DELETE
 - `/devices/{id}/lost_mode` — POST, DELETE
@@ -1246,6 +1253,8 @@ All credentials are stored exclusively in the system keychain:
 - MunkiReport auth header value — per-account, namespaced by UUID
 - MunkiReport cookie — per-account, namespaced by UUID
 
+Device secrets fetched with `show_secrets=true` are held in memory only and excluded from the on-disk device cache.
+
 No secrets are written to UserDefaults, logs, or any file on disk. API keys are redacted in all internal logging. Destructive operations require typed confirmation or explicit confirmation dialogs before execution.
 
 ## Architecture Diagram
@@ -1257,7 +1266,7 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 └─────────────────────┬───────────────────────────────┘
                       │ @Environment
 ┌─────────────────────▼───────────────────────────────┐
-│                 Service Layer                         │
+│                 SimpleMDMService                      │
 │  @Observable @MainActor                               │
 │  ┌─────────────────┐  ┌────────────────────────────┐ │
 │  │ ResourceCatalog │  │ Observed device/UI state   │ │
@@ -1327,11 +1336,29 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 
 ### Unreleased
 
-- **DEP token status visibility** — the dashboard now shows DEP server token status buckets (valid / expiring soon / expired / missing), adds a conditional token-expiry action item, and surfaces token-expiry fields in DEP server detail.
+### 1.8.2 (Build 15)
+
+**Added**
+- Custom declaration detail shows the Payload UUID (used to reference asset declarations) with selectable text.
+
+### 1.8.1 (Build 14)
+
+**Fixes**
+- Keychain writes for connection secrets now run on a background serial queue instead of the main thread.
+
+### 1.8.0 (Build 13)
+
+**Device secrets**
+- New Show Device Secrets setting sends `show_secrets=true` on Devices API requests (needs the Device Secrets key permission). Device detail gains a masked Device Secrets card covering FileVault recovery keys, firmware and recovery lock passwords, Activation Lock bypass codes, admin passwords, and Lock & Erase PINs. Secrets never reach the on-disk cache.
+
+### 1.7.3 (Build 12)
+
+**API path fixes**
+- Send Message now posts to the documented `push_message` endpoint. Device and assignment group custom attribute reads and writes use the documented `custom_attribute_values` paths with `PUT` for sets.
 
 ### 1.7.2 (Build 11)
 
-**DEP token status visibility**
+**Dashboard: DEP token visibility**
 - The dashboard now shows DEP server token status buckets (valid / expiring soon / expired / missing), adds a conditional token-expiry action item, and surfaces token-expiry fields in DEP server detail.
 
 ### 1.7.2 (Build 10)
@@ -1369,13 +1396,13 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 - **API-matching validation** — auto-renew SCEP is rejected (and auto-disabled in the UI) when Declarative is on, versions must be dotted-numeric, and maximum must be ≥ minimum (numeric compare, so `14.10 > 14.4`). Added `CustomConfigurationProfileInputTests`.
 
 **Packaging & distribution**
-- **Build number now actually reports Build 6** — the app bundle version metadata had `CFBundleVersion` hardcoded to `3` (so Builds 4/5/6 all shipped as 3); it now uses the current project version, matching how the short version uses the marketing version.
+- **Build number now actually reports Build 6** — `Config/Info.plist` had `CFBundleVersion` hardcoded to `3` (so Builds 4/5/6 all shipped as 3); it now uses `$(CURRENT_PROJECT_VERSION)`, matching how the short version uses `$(MARKETING_VERSION)`.
 - **App stapled for offline first launch** — the distributed `.app` is notarized and stapled in its own right (not just the DMG), so it passes Gatekeeper offline after being copied out of the DMG. Both app and DMG carry tickets; the release DMG was verified to download, mount, and launch cleanly.
 
 ### 1.6.0 (Build 5)
 
 **New device actions (SimpleMDM API parity through v1.55)**
-- **Send Message** — per-device message sheet plus a bulk variant (one message to all selected). Supervised iOS-family only. `POST /devices/{id}/send_message`.
+- **Send Message** — per-device message sheet plus a bulk variant (one message to all selected). Supervised iOS-family only. `POST /devices/{id}/push_message`.
 - **Disable Activation Lock** — per-device confirmation action plus bulk variant; gated to enrolled, supervised devices with Activation Lock on. `POST /devices/{id}/disable_activation_lock`. Device detail now shows an "Activation Lock" status row.
 - **Refresh Cellular Plans** — per-device action with an https-validated eSIM server URL sheet. Enrolled, cellular-capable iOS devices. `POST /devices/{id}/refresh_cellular_plans` (`esim_server_url`).
 - **Wipe → Preserve Managed Apps** — new wipe toggle (`preserve_managed_apps`), available only with Return to Service (iOS 26+ / visionOS 26+, DEP + bootstrap token).
@@ -1386,7 +1413,7 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 **Performance**
 - **Fixed a ~26-second main-thread stall at launch on large fleets.** `DateHelper.date(from:)` allocated a fresh `ISO8601DateFormatter` on every call, and the dashboard re-parsed and re-sorted every device by last-seen date on each render (parsing inside the sort comparator, recomputed twice per `body`). On a 449-device account this produced hundreds of thousands of formatter allocations and saturated the main thread for ~26s during startup revalidation. The formatters are now cached and reused, and the Recently Seen list and stale-device count parse each date once per render (added `DateHelperTests`).
 
-> The Send Message body field (`message`) and the Disable Activation Lock empty-body contract follow the SimpleMDM v1.55 release notes and are not yet in the public API reference — verify on a supervised test device before broad rollout.
+> Send Message (`POST /devices/{id}/push_message`, `message` up to 225 characters) and Disable Activation Lock (empty body) are documented in the public SimpleMDM API reference as of 2026-09.
 
 ### 1.5.6 (Build 4)
 
@@ -1400,22 +1427,22 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 - **Script job watcher** — `watchScriptJobForCompletion` now propagates `CancellationError` from `Task.sleep` so the poll loop exits immediately on cancellation rather than ignoring it.
 - **Modern CPU offloading** — `sortedDevices` and `buildDashboardSnapshot` are now `@concurrent nonisolated` async functions. All four `Task.detached { }.value` sort/snapshot sites are replaced with direct `await` calls, expressing off-actor intent at the declaration rather than every call site.
 - **Background decoding** — `decodeInBackground` is now `@concurrent`, removing the nested `Task.detached` wrapper.
-- **Removed redundant main-actor hops** — Eliminated two unnecessary `await MainActor.run {}` calls in device detail that were no-ops because the work was already on the main actor.
+- **Removed redundant main-actor hops** — Eliminated two unnecessary `await MainActor.run {}` calls in `DeviceDetailView` that were no-ops (already on the main actor inside a `Task {}` from a `@MainActor` view).
 
 **SwiftUI modernisation**
-- **`@Observable` navigation state** — navigation state migrated from `ObservableObject`/`@Published`/`@StateObject`/`@EnvironmentObject` to `@Observable @MainActor`. Views now receive per-property change notifications instead of full-view invalidation on any state change.
+- **`@Observable` navigation state** — `AppNavigationState` migrated from `ObservableObject`/`@Published`/`@StateObject`/`@EnvironmentObject` to `@Observable @MainActor`. Views now receive per-property change notifications instead of full-view invalidation on any state change. `AppTab` and `DevicePostureFilter` moved to dedicated files.
 - **`foregroundStyle` everywhere** — Replaced all deprecated `.foregroundColor()` calls with `.foregroundStyle()` across 38 view files.
-- **`clipShape` everywhere** — Replaced all deprecated `.cornerRadius()` calls with `.clipShape(.rect(cornerRadius:))` across the dashboard, inventory, and related glass-style text fields.
-- **`scrollIndicators` modernised** — Replaced the deprecated `showsIndicators:` initializer parameter with `.scrollIndicators()` on the inventory and package-info views.
+- **`clipShape` everywhere** — Replaced all deprecated `.cornerRadius()` calls with `.clipShape(.rect(cornerRadius:))` in `DashboardView`, `DeviceListView`, and `GlassTextField`.
+- **`scrollIndicators` modernised** — Replaced deprecated `showsIndicators:` initializer parameter with `.scrollIndicators()` modifier in `DeviceListView` and `MunkiPkginfoView`.
 - **Account switcher accessibility** — `onTapGesture` in `AccountSwitcherView` replaced with `Button`, making account rows accessible to VoiceOver and Voice Control.
-- **Automatic task cancellation** — `Task {}` inside the inventory screen's appearance flow for device hydration was replaced with `.task {}` so the work is automatically cancelled if the view disappears before it completes.
+- **Automatic task cancellation** — `Task {}` inside `DeviceListView.onAppear` for device hydration replaced with `.task {}` modifier so the work is automatically cancelled if the view disappears before it completes.
 
 **Startup diagnostics**
 - **Accurate `totalMs` in deferred hydration log** — The original startup timestamp is now threaded through the full deferred-hydration call chain so the "first publish" log line reflects true wall-clock time from app launch rather than always showing 0ms.
 - **Named publish sources** — Every device-list publish now carries a descriptive source label in the startup timing log (`sync_page`, `query_page`, `load_more`, `startup_page`, `bg_sync_page`, `bg_sync_complete`) instead of `unspecified`.
 
-**Performance — `@Observable` migration for the shared service layer**
-- **Eliminated 24-second startup revalidation delay** — the shared service layer migrated from `ObservableObject`/`@Published` to the modern `@Observable` macro. With `ObservableObject`, every property change fires `objectWillChange` across all subscriber views, causing full body re-evaluations of large views. During startup revalidation, this kept the main actor occupied for up to 24 seconds, blocking the revalidation task from starting. With `@Observable`, only views that read a specific property re-render when it changes. Startup revalidation on a warm launch dropped from 24.6 seconds to 167ms.
+**Performance — `@Observable` migration for `SimpleMDMService`**
+- **Eliminated 24-second startup revalidation delay** — `SimpleMDMService` migrated from `ObservableObject`/`@Published` (46 properties) to the modern `@Observable` macro. With `ObservableObject`, every property change fires `objectWillChange` across all 30 subscriber views, causing full body re-evaluations of large views (DashboardView is 2598 lines). During startup revalidation, this kept the main actor occupied for up to 24 seconds, blocking the revalidation Task from starting. With `@Observable`, only views that read a specific property re-render when it changes. The `startCachedLaunchRevalidation` Task now starts within 1ms of being queued rather than waiting up to 24 seconds. Startup revalidation on a warm launch dropped from 24.6 seconds to 167ms.
 - **Inline device hydration** — Deferred device list hydration now runs inline before revalidation starts, guaranteeing devices are available to the list view immediately at ~160ms alongside the dashboard snapshot rather than waiting for the main actor to become free.
 
 ### 1.5.5 (Build 3)
