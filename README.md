@@ -1261,7 +1261,7 @@ Device secrets fetched with `show_secrets=true` are held in memory only and excl
 
 No secrets are written to UserDefaults, logs, or any file on disk. API keys are redacted in all internal logging. Destructive operations require typed confirmation or explicit confirmation dialogs before execution.
 
-The app ships a privacy manifest (`PrivacyInfo.xcprivacy`): no tracking, no collected data, and a single required-reason API entry for UserDefaults (CA92.1). All traffic is HTTPS to SimpleMDM and, optionally, your MunkiReport host; the app declares `ITSAppUsesNonExemptEncryption = NO`.
+See [PRIVACY.md](PRIVACY.md) for the full privacy policy. The app ships a privacy manifest (`PrivacyInfo.xcprivacy`): no tracking, no collected data, and a single required-reason API entry for UserDefaults (CA92.1). All traffic is HTTPS to SimpleMDM and, optionally, your MunkiReport host; the app declares `ITSAppUsesNonExemptEncryption = NO`.
 
 ## Architecture Diagram
 
