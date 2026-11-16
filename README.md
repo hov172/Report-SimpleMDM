@@ -145,7 +145,9 @@ The top-level app experience is organized into four main tabs:
 - `Admin`
 - `Settings`
 
-On first launch, the app shows a setup flow that writes the SimpleMDM API key to the keychain and saves connection metadata in user defaults. Once configured, the main tab UI is unlocked.
+On first launch, the app shows a setup flow that verifies the SimpleMDM API key against `GET /account`, writes it to the keychain, and saves connection metadata in user defaults. Once configured, the main tab UI is unlocked.
+
+The welcome screen also offers `Try with sample data`. Sample data mode runs the entire app against a bundled fictional tenant (14 devices across macOS, iOS, and tvOS, plus groups, profiles, apps, scripts, webhooks, and logs) without an account or network access. A `URLProtocol` registered on the service session answers requests signed with the sample-mode sentinel key from JSON fixtures in `ReportSimpleMDM/DemoData`, so every view, decoder, and filter runs unchanged. Write actions return a 403 with "Not available in sample data mode", a banner marks every tab, and sample records cache under their own host key so they never mix with a real tenant. Saving a real key or tapping `Connect tenant` exits the mode. Fixtures are regenerated with `scripts/generate_demo_fixtures.py`.
 
 ### Connecting To The Optional MunkiReport Module
 
@@ -786,7 +788,7 @@ The settings area is mature and covers both connection management and operationa
 Current settings coverage includes:
 
 - backend mode selection
-- SimpleMDM API key entry
+- SimpleMDM API key entry — verified against `GET /account` before it is saved; a rejected key shows an inline error and nothing is stored. A link to the SimpleMDM admin console (Settings > API) sits under the field
 - optional MunkiReport base URL
 - optional MunkiReport auth header name and value
 - optional MunkiReport cookie
@@ -808,7 +810,9 @@ Current settings coverage includes:
 - bundle version and build visibility
 - debug logging toggle for full fleet sync pagination
 - `Show Device Secrets` toggle — sends `show_secrets=true` on Devices API requests; requires the `Device Secrets` API key permission
-- `Clear Saved Connection`
+- `Clear Saved Connection` — removes the API key and MunkiReport secrets, returning to the welcome screen
+- `Reset App` — factory reset: clears every key and saved account, the SwiftData cache (devices, resources, snapshots, smart groups, sync history), sample data mode, and every preference
+- `Leave Sample Data Mode` — shown at the top of Server & API while sample data mode is on
 
 Account-level settings:
 
@@ -1058,8 +1062,8 @@ Quickest safe default:
 ## Quickstart
 
 1. Build and run the app on macOS, iOS, iPadOS, or visionOS.
-2. On first launch, enter your SimpleMDM API key when prompted.
-3. The app saves the key to the keychain and loads the fleet.
+2. On first launch, enter your SimpleMDM API key when prompted, or tap `Try with sample data` to explore every screen with a fictional tenant first.
+3. The app verifies the key, saves it to the keychain, and loads the fleet.
 4. Use the `Devices` tab to browse and filter your fleet.
 5. Tap any device to open its detail screen.
 6. Use the `Admin` tab for management operations.
@@ -1257,6 +1261,8 @@ Device secrets fetched with `show_secrets=true` are held in memory only and excl
 
 No secrets are written to UserDefaults, logs, or any file on disk. API keys are redacted in all internal logging. Destructive operations require typed confirmation or explicit confirmation dialogs before execution.
 
+The app ships a privacy manifest (`PrivacyInfo.xcprivacy`): no tracking, no collected data, and a single required-reason API entry for UserDefaults (CA92.1). All traffic is HTTPS to SimpleMDM and, optionally, your MunkiReport host; the app declares `ITSAppUsesNonExemptEncryption = NO`.
+
 ## Architecture Diagram
 
 ```
@@ -1335,6 +1341,17 @@ No secrets are written to UserDefaults, logs, or any file on disk. API keys are 
 ## Changelog And Release History
 
 ### Unreleased
+
+### 1.8.3 (Build 16)
+
+**Added**
+- Sample data mode: `Try with sample data` on the welcome screen runs the whole app against a bundled fictional tenant with no API key. Write actions are refused with a clear message and a banner marks every tab.
+- `Reset App` in Server & API returns the app to first-launch state.
+- API key is verified against `GET /account` before it is saved; a link to the SimpleMDM admin console sits under the key field.
+- Welcome screen always starts on `SimpleMDM API Only`; header text wraps on iPhone.
+
+**App Store readiness**
+- Privacy manifest (`PrivacyInfo.xcprivacy`) and `ITSAppUsesNonExemptEncryption = NO`.
 
 ### 1.8.2 (Build 15)
 
