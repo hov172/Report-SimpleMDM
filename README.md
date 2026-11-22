@@ -6,8 +6,10 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 
 ## Download
 
-- **iOS (TestFlight):** [Join the public beta](https://testflight.apple.com/join/JMh5jvXY)
-- **macOS:** notarized DMG on the [Releases page](https://github.com/hov172/Report-SimpleMDM/releases/latest)
+- **iOS and iPadOS (App Store):** [ReportSimpleMDM on the App Store](https://apps.apple.com/us/app/reportsimplemdm/id6760626379)
+- **macOS (Mac App Store):** [ReportSimpleMDM on the Mac App Store](https://apps.apple.com/us/app/reportsimplemdm/id6760626379?platform=mac)
+- **macOS (direct):** notarized DMG on the [Releases page](https://github.com/hov172/Report-SimpleMDM/releases/latest) if you prefer not to use the Mac App Store
+- **iOS (TestFlight):** [Join the public beta](https://testflight.apple.com/join/JMh5jvXY) to get builds before they reach the App Store
 
 ---
 ## 🌐 Connect With Me
@@ -50,6 +52,7 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 - [How Data Flows Through The App](#how-data-flows-through-the-app)
 - [Startup, Sync, Cache, And Snapshot Lifecycle](#startup-sync-cache-and-snapshot-lifecycle)
 - [MunkiReport SimpleMDM Module](#munkireport-simplemdm-module)
+- [Works With SimpleMDM-MunkiReport And SimpleMDM-MCP](#works-with-simplemdm-munkireport-and-simplemdm-mcp)
 - [Quickstart](#quickstart)
 - [Deployment Examples](#deployment-examples)
 - [Feature To Data Source Mapping](#feature-to-data-source-mapping)
@@ -1026,6 +1029,40 @@ When a sync session goes idle, it is finalized into a summary that records:
 - source (manual or background)
 
 Recent summaries are stored locally and surfaced in Settings and dashboard sync-health views.
+
+## Works With SimpleMDM-MunkiReport And SimpleMDM-MCP
+
+ReportSimpleMDM is one of three companion projects. Each works on its own; together they share one data path, with the MunkiReport module in the middle.
+
+| Project | What it is | Talks to |
+|---|---|---|
+| [ReportSimpleMDM](https://github.com/hov172/ReportSimpleMDM) (this app) | Native macOS / iOS / iPadOS client | SimpleMDM API directly; optionally the MunkiReport module (read-only) |
+| [SimpleMDM-MunkiReport](https://github.com/hov172/SimpleMDM-MunkiReport) | A MunkiReport module that syncs SimpleMDM data into MunkiReport and exposes `/module/simplemdm/...` routes | SimpleMDM API (its own sync); serves the app and the MCP |
+| [SimpleMDM-MCP](https://github.com/hov172/SimpleMDM-MCP) | An MCP server that lets Claude or any MCP client query and act on SimpleMDM in natural language | SimpleMDM API directly; optionally the MunkiReport module (reads data, writes findings) |
+
+How the pieces connect:
+
+```
+SimpleMDM API
+   |            \
+   |             \ (module sync)
+   v              v
+ReportSimpleMDM   SimpleMDM-MunkiReport module  <--push findings--  SimpleMDM-MCP
+   |                 ^   |                                             ^
+   |                 |   |                                             |
+   +----reads--------+   +------------------reads-----------------------+
+```
+
+- **ReportSimpleMDM and the MunkiReport module.** Switch `Settings > Server & API > Backend Mode` to `SimpleMDM + MunkiReport Module`, enter the MunkiReport base URL, and authenticate with the `X-SIMPLEMDM-API-KEY` header set to the same SimpleMDM API key the module stores. The app then enriches the dashboard and device detail with module data. Full steps are in [MunkiReport SimpleMDM Module](#munkireport-simplemdm-module) below, and the server-side view is in the [module README](https://github.com/hov172/SimpleMDM-MunkiReport#connect-reportsimplemdm).
+- **SimpleMDM-MCP and the MunkiReport module.** In the MCP server's environment set `MUNKIREPORT_BASE_URL`, `MUNKIREPORT_AUTH_HEADER_NAME=X-SIMPLEMDM-API-KEY`, and `MUNKIREPORT_AUTH_HEADER_VALUE` to that same API key. The MCP can then read module data (`get_munkireport_*` tools) and publish audit results into the module's findings channel, either on demand with `push_munkireport_findings` or automatically with `MUNKIREPORT_ENABLED=true`. Details are in the [module README](https://github.com/hov172/SimpleMDM-MunkiReport#connect-simplemdm-mcp-natural-language-queries) and the MCP's [findings middleware doc](https://github.com/hov172/SimpleMDM-MCP/blob/main/docs/findings-middleware.md).
+- **ReportSimpleMDM and SimpleMDM-MCP.** There is no direct connection between the app and the MCP server. They meet through the module: findings the MCP publishes show up in the app's **MunkiReport Insights** dashboard section (MCP Findings, Findings Timeline, Top Devices by Findings) and in each device's detail view. If MunkiReport is not configured in the app, nothing from the MCP is shown.
+
+Minimum setup for the full loop:
+
+1. Install and sync the SimpleMDM-MunkiReport module on your MunkiReport server.
+2. Point the MCP server at that MunkiReport instance with the three `MUNKIREPORT_*` variables above and run an audit tool or enable auto-publish.
+3. In ReportSimpleMDM, enable the MunkiReport backend mode with the same base URL and API key.
+4. One API key is shared by all three. If you rotate it in SimpleMDM, update the module, the MCP environment, and the app together.
 
 ## MunkiReport SimpleMDM Module
 
