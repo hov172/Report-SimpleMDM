@@ -54,6 +54,7 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 - [MunkiReport SimpleMDM Module](#munkireport-simplemdm-module)
 - [Works With SimpleMDM-MunkiReport And SimpleMDM-MCP](#works-with-simplemdm-munkireport-and-simplemdm-mcp)
 - [Quickstart](#quickstart)
+- [Using The Fleet Assistant And Automation](#using-the-fleet-assistant-and-automation)
 - [Deployment Examples](#deployment-examples)
 - [Feature To Data Source Mapping](#feature-to-data-source-mapping)
 - [Capability Matrix](#capability-matrix)
@@ -1133,6 +1134,92 @@ To add a second SimpleMDM account:
 3. Change the API key in `Settings > Server & API` to the new account.
 4. Return to `Settings > Saved Accounts` and save again with a different name.
 5. Tap either account row to switch between them instantly.
+
+## Using The Fleet Assistant And Automation
+
+Everything in this section was added in 2.0.0. The reference table of engines, limits, and the full tool registry lives under [Fleet assistant engines](#fleet-assistant-engines); this section is the hands-on walkthrough.
+
+### Step 1: Pick An Engine
+
+Open `Settings > Assistant`. The engine picker lists seven options. Pick the first one that fits:
+
+| You want | Choose | Setup |
+|---|---|---|
+| No setup, nothing leaves the device | **Apple Intelligence (on device)** | Requires macOS 26 / iOS 26 with Apple Intelligence turned on in System Settings. Greyed out otherwise. |
+| Works offline on older OS versions | **Bundled model (on device)** | Nothing to configure. Qwen3 1.7B ships inside the app (about 1.1 GB). Apple Silicon Mac, Intel Mac with 16 GB, or an iPhone/iPad with 8 GB. First message loads the model; it unloads when you leave the chat. |
+| Your own LLM server | **Ollama (your own server)** | Install [Ollama](https://ollama.com), run `ollama pull llama3.1` (or `qwen3`, any tool-capable model), then enter the server address (default `http://localhost:11434`) and the model name. On an iPhone, point it at your Mac's LAN address. Tap `Load models` to pick from what the server has. |
+| Best answers, you have an API key | **Claude**, **OpenRouter**, **GitHub Copilot Models**, or **OpenAI / Codex** | Paste the key or token into the labelled field on that engine's card. The eye toggle shows it while you check it. Tap `Load models` to fetch the provider's catalog and pick one, or type a model id. |
+
+Keys and tokens go into the Keychain, one entry per provider, and are sent only to that provider's endpoint. Where to get them:
+
+- **Claude**: an Anthropic API key from `console.anthropic.com`.
+- **OpenRouter**: a key from `openrouter.ai/keys`; use any catalog model that supports tool calling.
+- **GitHub Copilot Models**: a GitHub personal access token with the `models` permission (included with a Copilot subscription).
+- **OpenAI / Codex**: an OpenAI API key from `platform.openai.com`.
+
+The first time you send a message through a cloud engine, a privacy sheet explains what is sent (your question, the fleet brief, and the results of any tools the model calls) and must be accepted once. On-device engines and Ollama never show it. See [docs/privacy/cloud-assistant.md](docs/privacy/cloud-assistant.md).
+
+### Step 2: Ask Something
+
+Open the `Assistant` tab. Every engine reads the same local cache that the rest of the app uses, so sync first if the data looks stale. Prompts that work well:
+
+- `how many devices are on each OS version, as a chart`
+- `which Macs have not checked in for 30 days`
+- `list the devices in the Marketing group with FileVault off`
+- `when does our push certificate expire`
+- `run a fleet security audit and summarize the critical findings`
+- `generate an inventory report for the Sales group as Excel`
+- `show the latest fleet digest`
+- `which OS update rollouts are behind their deadline`
+
+What you get back:
+
+- **Tables** for lists of more than a few devices, scrollable sideways on iPhone with a fullscreen expand button.
+- **Charts** (bar, line, pie) when counts are compared. Tap or drag on a chart to read values; tap the expand button for fullscreen.
+- **Report attachments** when you ask for a report. Each run produces PDF, Markdown, CSV, Word, Excel, and JSON; the share button on the attachment picks the format you named.
+- **A footer** on every answer naming the engine, the token count, and, for cloud engines, that the request was sent to that provider.
+
+The side panel (`Fleet brief` on Mac and iPad) shows the compact fleet summary the model sees on every turn.
+
+### Step 3: Let It Make Changes (Optional)
+
+Write tools are off by default. Turn on `Settings > Assistant > Allow write actions` to enable them. Even then nothing runs on its own:
+
+1. Ask for the change, for example `move SN12345 to the Finance group` or `push the Wi-Fi profile to the Sales group`.
+2. The assistant replies with an **approval card** showing exactly what will be sent to SimpleMDM.
+3. Tap **Approve** to run it, or dismiss it. Destructive actions (wipe, erase, lock) ask a second time.
+4. Removing a profile from a group shows the **Profile Assignment Preview** on the card first, so you can see which devices would lose it.
+5. Restart and Disable Activation Lock requests record a receipt in **Device Action History** before they are sent.
+
+Write cards respect your API key's permissions. If SimpleMDM refuses a path with 401 or 403, the assistant remembers it and refuses later proposals on that path with the reason.
+
+### Step 4: Schedule A Fleet Digest
+
+A digest compares two complete syncs and reports what changed: devices added or removed, OS and posture changes, new and resolved audit findings, expiring push and DEP credentials, and OS rollout deadlines.
+
+1. Open `Settings > Fleet Digest` and turn on `Fleet digest`.
+2. Choose `Cadence` (daily or weekly) and `Scope` (whole fleet or one assignment group).
+3. Tick the change categories you care about.
+4. Turn on `Notify when there are changes`. The app asks for notification permission at that moment, not at launch. `Also notify when all clear` sends a quiet "no changes" note.
+5. Tap `Compare now` to build the first baseline. From then on the digest runs after each background refresh on iOS and on every foreground activation on macOS.
+
+Read digests under `Admin > Fleet Digest`. Each one exports to PDF or CSV. With `AI narrative` on, an `Explain this digest` button runs one tool-free turn on your selected engine over the stored events only; it never runs in the background and cloud engines need the same one-time privacy acceptance.
+
+### Step 5: Track An OS Update Rollout
+
+1. Open `Admin > OS Update Rollouts` and tap `Track rollout`, or start one directly from an OS version or end-of-life finding in a Fleet Audit.
+2. Pick the assignment group, the minimum OS version, and a follow-up deadline. The group's membership is frozen at that moment so the target does not drift.
+3. Each full sync updates how many devices have reached the target. When the deadline passes, the next Fleet Digest includes a follow-up entry.
+4. Export the remaining devices to CSV to chase them.
+
+### Troubleshooting
+
+- **Apple Intelligence is greyed out**: the device or OS does not support it, or it is off in System Settings. Pick the bundled model instead.
+- **Bundled model missing** in a source build: run `scripts/fetch_local_model.sh` before building. See [Building the local model engine](#building-the-local-model-engine).
+- **Ollama on iPhone cannot connect**: use the Mac's LAN IP, not `localhost`, and start Ollama with `OLLAMA_HOST=0.0.0.0 ollama serve` so it listens beyond loopback.
+- **`Load models` fails**: the key is wrong or lacks the models permission (GitHub). The error text names the HTTP status.
+- **On-device answers are shallow**: Apple Intelligence and the bundled model see a keyword-routed subset of tools because of their small context window. Ask narrower questions, or turn on `Send all tools` for Ollama models with a large window.
+- **Answer looks stale**: the assistant only reads the cache. Pull to refresh on the Devices tab, then ask again.
 
 ## Deployment Examples
 
