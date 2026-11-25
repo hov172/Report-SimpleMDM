@@ -72,6 +72,8 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 - [Security And Storage](#security-and-storage)
 - [Current Boundaries And Caveats](#current-boundaries-and-caveats)
 - [Bottom Line](#bottom-line)
+- [Building the local model engine](#building-the-local-model-engine)
+- [Fleet assistant engines](#fleet-assistant-engines)
 - [Connect With Me](#connect-with-me)
 
 ## What The App Can Do Today
@@ -81,14 +83,20 @@ At a practical level, the current codebase supports all of the following:
 - connect directly to SimpleMDM with a saved API key
 - save and switch between multiple SimpleMDM accounts without re-entering credentials
 - browse and filter the live device fleet
-- bulk-select devices and execute lock, sync, or push-apps across all selected at once
+- bulk-select devices and execute lock, sync, push-apps, restart, disable Activation Lock, or send-message across all selected at once
 - export the current device list to CSV via the native share sheet
 - cache fleet data locally for fast relaunches
 - inspect enrolled and non-enrolled devices
 - load device subresources including profiles, apps, users, and logs
 - view and inline-edit custom attribute values per device
 - run scripts on a specific device and receive a local notification when the job completes
-- execute common and advanced device actions
+- execute common and advanced device actions, and review single-attempt **Device Action History** receipts with read-only check-in, Activation Lock, and command-log evidence plus CSV export
+- preview live **Profile Assignment Preview** impact (lose, keep, or need verification) before removing a profile from a group across Profile Manager, Assignment Group Manager, and assistant approval cards, and inspect per-device profile assignment sources and App Restrictions precedence
+- run offline **Fleet Audits** against the cached fleet and the public SOFA OS feed (`sofafeed.macadmins.io`) with prioritized findings and fixes
+- generate, preview (paginated PDFKit), compare, and export **Reports** (Fleet Security Audit, Device Logs Audit, Inventory, Executive Summary, Configuration Backup, and Custom Reports with reusable templates) as PDF, Markdown, CSV, Word (`.docx`), and Excel (`.xlsx`)
+- schedule daily or weekly **Fleet Digests** comparing complete sync snapshots with opt-in local notifications, PDF/CSV export, and optional on-demand AI narrative
+- track frozen assignment-group cohorts against a minimum OS target and deadline in **OS Update Rollouts**, with deadline follow-up digests and spreadsheet-safe CSV exports
+- query the fleet and run approval-gated operations in the **Assistant** tab across **7 AI engines** (on-device Apple Intelligence, bundled `llama.cpp`/Qwen3, Ollama, Claude, OpenRouter, GitHub Copilot Models, and OpenAI / Codex) with **213 tools**, native Markdown rendering, interactive Swift Charts, and fullscreen table/chart expand viewers
 - summarize DEP server token status on the dashboard and surface a token-expiry action item when renewal is needed
 - view the push certificate expiry date and see a prominent warning banner when it is within 30 days
 - review dashboard Action Items and customize which triage signals are shown
@@ -141,11 +149,12 @@ If MunkiReport is not configured, the app still functions as a standalone Simple
 
 ### App Structure
 
-The top-level app experience is organized into four main tabs:
+The top-level app experience is organized into five main tabs:
 
 - `Dashboard`
 - `Devices`
 - `Admin`
+- `Assistant`
 - `Settings`
 
 On first launch, the app shows a setup flow that verifies the SimpleMDM API key against `GET /account`, writes it to the keychain, and saves connection metadata in user defaults. Once configured, the main tab UI is unlocked.
@@ -406,14 +415,16 @@ Current action coverage includes:
 - wipe — including the additional parameters Preserve cellular data plan, Release Activation Lock, Disallow Proximity Setup, Return to Service (with WiFi profile picker), **Preserve Managed Apps** (iOS 26+/visionOS 26+, with Return to Service), and Obliteration behavior (macOS)
 - sync or refresh
 - clear passcode
-- restart
+- **restart** — remote restart for supervised devices; also available as a confirmation-gated bulk action with receipt tracking
 - shutdown
 - push apps
 - clear restrictions password
 - **send message** — composes and sends a message to the device (supervised iOS/iPadOS); also available as a bulk action
-- **disable activation lock** — releases Activation Lock so the device can be set up by a new user (enrolled + supervised devices that currently have Activation Lock on); also available as a bulk action
+- **disable activation lock** — releases Activation Lock so the device can be set up by a new user (enrolled + supervised devices that currently have Activation Lock on); also available as a confirmation-gated bulk action with receipt tracking
 - **refresh cellular plans** — refreshes eSIM/cellular plans using the carrier's eSIM server URL (enrolled, cellular-capable iOS devices)
 - unenroll
+
+Tracked **Restart** and **Disable Activation Lock** requests (from Device Detail, bulk actions, and Assistant writes) persist an account-scoped **Device Action History** receipt before sending and execute single-attempt (`maxAttempts = 1`) so transient network failures never duplicate commands. Refreshing evidence in **Admin → Device Action History** (or from Device Detail / the post-batch results sheet) performs only read-only `GET` requests for device state and command logs, distinguishes `Confirmed`, `Unverified`, `Rejected`, and `Command failed`, and exports filtered rows to CSV.
 
 Each action is gated by an availability rule and shows a disabled state with the reason when the current device does not qualify (for example, not enrolled, not supervised, Activation Lock not enabled, or no cellular capability). The device detail inventory also surfaces an **Activation Lock** status row (Enabled / Disabled / Unknown).
 
@@ -547,7 +558,8 @@ Current profile workflows include:
 - inspect live or custom profile details
 - deploy profiles to devices
 - deploy profiles to device groups
-- manage assignment-group relationships for profiles
+- manage assignment-group relationships for profiles, with live **Profile Assignment Preview** before removing a profile from a group (showing which devices will lose their last known assignment, keep the profile via another direct/group/legacy source, or need verification)
+- inspect per-device profile assignment sources and competing App Restrictions group priority from Device Detail
 
 The codebase distinguishes:
 
@@ -752,6 +764,10 @@ It currently includes:
 
 The Admin Center also includes direct entry points into:
 
+- Fleet Audit
+- Reports (built-in and Custom Report builder with reusable templates)
+- OS Update Rollouts
+- Fleet Digest
 - App Catalog Manager
 - Profile Manager
 - Enrollment Manager
@@ -765,6 +781,7 @@ The Admin Center also includes direct entry points into:
 - Custom Declarations
 - Custom Attributes
 - Webhook Manager
+- Device Action History
 - Account Logs
 
 ### 23. API Explorer
@@ -817,10 +834,13 @@ Current settings coverage includes:
 - `Reset App` — factory reset: clears every key and saved account, the SwiftData cache (devices, resources, snapshots, smart groups, sync history), sample data mode, and every preference
 - `Leave Sample Data Mode` — shown at the top of Server & API while sample data mode is on
 
-Account-level settings:
+Account-level and operational settings:
 
 - `Account` — view and edit account details, push cert info, ABM status
 - `Saved Accounts` — save the current connection, switch accounts, delete saved profiles
+- `Assistant` — choose among the 7 AI engines, store per-provider API keys/tokens (Keychain), load available model lists from each provider, configure Ollama URL and send-all-tools toggle, and opt into approval-gated `Allow write actions`
+- `Fleet Digest` — enable/pause daily or weekly digests, scope to whole fleet or an assignment group, choose change categories (including OS rollout follow-ups), opt into local notifications and on-demand AI narrative, or run `Compare now`
+- `Acknowledgements` — open-source licenses for bundled components (`llama.cpp`, `Qwen3`)
 
 Two settings-adjacent informational screens also exist for hybrid deployments:
 
@@ -1288,48 +1308,49 @@ None currently known. (Fixed in 1.5.5: dashboard count corruption from active se
 
 ## Security And Secrets
 
-All credentials are stored exclusively in the system keychain:
+All credentials are stored exclusively in the system data-protection keychain (`kSecUseDataProtectionKeychain`):
 
 - SimpleMDM API key — per-account, namespaced by UUID
 - MunkiReport auth header value — per-account, namespaced by UUID
 - MunkiReport cookie — per-account, namespaced by UUID
+- Optional cloud AI provider keys/tokens (Anthropic, OpenRouter, GitHub Models, OpenAI) — per-provider Keychain entries
 
 Device secrets fetched with `show_secrets=true` are held in memory only and excluded from the on-disk device cache.
 
-No secrets are written to UserDefaults, logs, or any file on disk. API keys are redacted in all internal logging. Destructive operations require typed confirmation or explicit confirmation dialogs before execution.
+No secrets are written to UserDefaults, logs, or any file on disk. API keys are redacted in all internal logging. Destructive operations require typed confirmation or explicit confirmation dialogs before execution, and assistant write tools are disabled by default behind an explicit approval card.
 
-See [PRIVACY.md](PRIVACY.md) for the full privacy policy. The app ships a privacy manifest (`PrivacyInfo.xcprivacy`): no tracking, no collected data, and a single required-reason API entry for UserDefaults (CA92.1). All traffic is HTTPS to SimpleMDM and, optionally, your MunkiReport host; the app declares `ITSAppUsesNonExemptEncryption = NO`.
+See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/cloud-assistant.md) for the full privacy policy and cloud AI disclosures. The app ships a privacy manifest (`PrivacyInfo.xcprivacy`): no tracking, no collected data, and a single required-reason API entry for UserDefaults (CA92.1); the app declares `ITSAppUsesNonExemptEncryption = NO`.
 
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                     SwiftUI Views                    │
-│  Dashboard │ Devices │ Device Detail │ Admin │ Settings │
-└─────────────────────┬───────────────────────────────┘
-                      │ @Environment
-┌─────────────────────▼───────────────────────────────┐
-│                 SimpleMDMService                      │
-│  @Observable @MainActor                               │
-│  ┌─────────────────┐  ┌────────────────────────────┐ │
-│  │ ResourceCatalog │  │ Observed device/UI state   │ │
-│  └─────────────────┘  └────────────────────────────┘ │
-│  ┌─────────────────┐  ┌────────────────────────────┐ │
-│  │ RequestLimiter  │  │ SyncSessionTracker         │ │
-│  └─────────────────┘  └────────────────────────────┘ │
-└──────────┬──────────────────────┬────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         SwiftUI Views                           │
+│  Dashboard │ Devices │ Device Detail │ Admin │ Assistant │ Settings │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ @Environment
+┌───────────────────────────▼─────────────────────────────────────┐
+│                       SimpleMDMService                          │
+│  @Observable @MainActor                                         │
+│  ┌─────────────────┐  ┌────────────────────────────┐            │
+│  │ ResourceCatalog │  │ Observed device/UI state   │            │
+│  └─────────────────┘  └────────────────────────────┘            │
+│  ┌─────────────────┐  ┌────────────────────────────┐            │
+│  │ RequestLimiter  │  │ SyncSessionTracker         │            │
+│  └─────────────────┘  └────────────────────────────┘            │
+└──────────┬──────────────────────┬───────────────────────────────┘
            │                      │
 ┌──────────▼──────────┐  ┌────────▼──────────────────┐
 │   SimpleMDM API     │  │  MunkiReport Module        │
 │   (HTTP Basic Auth) │  │  (optional enrichment)     │
 └─────────────────────┘  └───────────────────────────┘
            │
-┌──────────▼──────────┐
-│   SwiftData Store   │
-│  Devices, Snapshots │
-│  Resources, Logs    │
-│  Smart Groups       │
-└─────────────────────┘
+┌──────────▼───────────────────────────────┐
+│   On-Device Persistence                  │
+│   SwiftData: Devices, Snapshots, Logs    │
+│   App Support: Reports, Digests,         │
+│                OS Rollouts, Action History│
+└──────────────────────────────────────────┘
 ```
 
 ## Troubleshooting Recipes
@@ -1377,7 +1398,17 @@ See [PRIVACY.md](PRIVACY.md) for the full privacy policy. The app ships a privac
 
 ## Changelog And Release History
 
-### Unreleased
+### 2.0.0 (Build 17)
+
+- **Fleet Assistant** — `Assistant` tab with 7 AI engines (Apple Intelligence, bundled Qwen3/`llama.cpp`, Ollama, Claude, OpenRouter, GitHub Copilot Models, OpenAI / Codex), 213 tools (126 read/analytics/builder/report/rollout/action-history + 87 approval-gated write tools), native Markdown (`swift-markdown-ui`), interactive Swift Charts with auto-horizontal bars and fullscreen expand, and compact `group_by` breakdowns in `list_devices`.
+- **Fleet Audit & Reports** — offline SOFA-backed compliance engine; 6 report types including Custom Reports with reusable templates, PDFKit paginated previews, Compare diffs, and PDF/Markdown/CSV/DOCX/XLSX exports.
+- **Fleet Digest** — scheduled daily/weekly fleet change and compliance digests with opt-in local notifications, transactional cursor commits, and optional on-demand AI narrative.
+- **OS Update Rollouts** — frozen assignment-group OS rollout tracking with deadline follow-up digests and CSV export.
+- **Profile Assignment Preview** — live removal impact previews in Profile Manager, Assignment Group Manager, and assistant approval cards, plus per-device assignment sources and App Restrictions priority.
+- **Device Action History** — single-attempt tracked Restart and Disable Activation Lock receipts with read-only evidence refresh, batch results, and CSV export.
+- **Data-protection keychain** — migrated secrets to `kSecUseDataProtectionKeychain` to avoid macOS signature-change prompts.
+- **Apple Intelligence hardening** — charts attach natively from tools instead of being transcribed by the on-device model; XPC interruptions reset the session and retry once; Markdown HTML-tag normalisation, landscape iPhone bubbles, scrollable tables and charts with fullscreen expand.
+- **Settings input chrome** — higher-contrast glass fields with labels, focus rings, and show/hide toggles; Server & API and the welcome screen share the settings card layout.
 
 ### 1.8.3 (Build 16)
 
@@ -1586,23 +1617,26 @@ See [PRIVACY.md](PRIVACY.md) for the full privacy policy. The app ships a privac
 
 | Data | Storage Location |
 |------|-----------------|
-| SimpleMDM API key | Keychain (per account, UUID-namespaced) |
-| MunkiReport auth header value | Keychain (per account, UUID-namespaced) |
-| MunkiReport cookie | Keychain (per account, UUID-namespaced) |
-| Connection metadata (URLs, mode, names) | UserDefaults |
+| SimpleMDM API key | Data-protection Keychain (per account, UUID-namespaced) |
+| MunkiReport auth header value | Data-protection Keychain (per account, UUID-namespaced) |
+| MunkiReport cookie | Data-protection Keychain (per account, UUID-namespaced) |
+| Optional AI provider API keys/tokens | Data-protection Keychain (per provider) |
+| Connection metadata (URLs, mode, names, Ollama URL) | UserDefaults |
 | Saved account metadata | UserDefaults (non-sensitive fields only) |
 | Active account ID | UserDefaults |
 | Cached devices and snapshots | SwiftData on-device store |
 | Smart groups | SwiftData on-device store |
 | Sync history | SwiftData on-device store |
+| Saved reports and custom templates | Application Support (`reports/<account>/`) |
+| Fleet digests, OS rollouts, device action receipts | Application Support (`digests/<account>/`) |
 
 ## Current Boundaries And Caveats
 
 - Binary file uploads (mobileconfig, certificate PEM, app IPA) are handled only in dedicated management views, not in the API Explorer.
 - The app does not support SimpleMDM multi-org accounts natively — each saved account profile corresponds to one SimpleMDM API key.
-- MunkiReport enrichment is read-only. The app does not write to MunkiReport.
+- Native MunkiReport dashboard/device enrichment is read-only; MunkiReport write routes (such as pushing audit findings) are available only through explicitly enabled, per-action approved Assistant write tools.
 - The app does not support VPP (Volume Purchase Program) token management.
-- Device log export is available at the account level (Account Logs → CSV). Per-device log export is not separately implemented; use the account-level export and filter by device serial in the exported file.
+- Device log export is available at the account level (Account Logs → CSV) and via the Device Logs Audit report (PDF/Markdown/CSV/DOCX/XLSX).
 
 ## Bottom Line
 
@@ -1621,3 +1655,33 @@ The app is production-ready for SimpleMDM fleet operators who want a native, fas
 - <a href="https://bsky.app/profile/ayalasolutions.bsky.social"><img src="https://raw.githubusercontent.com/bluesky-social/social-app/main/assets/logo.png" width="20" alt="Bluesky Logo"></a> [@AyalaSolutions](https://bsky.app/profile/ayalasolutions.bsky.social)  
 - [![Buy Me A Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hov172)  
 - 📧 *Contact via GitHub, Social accounts issues or discussions*  
+
+## Building the local model engine
+
+The fleet assistant's bundled engine needs two git-ignored artifacts, pinned in `scripts/local_model.lock`:
+
+```bash
+scripts/fetch_local_model.sh   # llama.cpp XCFramework (72 MB) and Qwen3 1.7B Q4_K_M GGUF (1.1 GB)
+```
+
+The "Verify local model" build phase fails the build with that script's name when the model is missing or its checksum differs. Simulator builds skip the framework (the release zip has no simulator slice), so the bundled engine reports itself unavailable there; use a Mac or a device. Licences for llama.cpp (MIT) and Qwen3 (Apache 2.0) ship in the app under Settings > Acknowledgements.
+
+## Fleet assistant engines
+
+The `Assistant` tab answers questions about the cached fleet, runs audits, generates reports, inspects digests/rollouts/action receipts, and (when explicitly enabled) proposes approval-gated write actions. Seven engines are available in **Settings → Assistant**:
+
+| Engine | Runs where | Needs | Data leaves the device | Notes |
+|---|---|---|---|---|
+| Apple Intelligence (on device) | macOS 26 / iOS 26 with Apple Intelligence enabled | nothing | no | 8,192-token window; history capped at six turns and compacted; keyword-routed tool subset (up to 8 tools). |
+| Bundled model (on device) | Apple Silicon Macs, Intel Macs with 16 GB, iPhones and iPads with 8 GB | model fetched by `scripts/fetch_local_model.sh` at build time | no | Qwen3 1.7B Q4_K_M on `llama.cpp`; ~1.1 GB in the app; loads on first message and unloads when leaving chat. |
+| Ollama (your own server) | Your Mac or LAN server (default `http://localhost:11434`) | a running Ollama instance with a tool-capable model (e.g. `llama3.1`, `qwen3`) | only to your Ollama server | No API key; optional send-all-tools toggle; always includes `find_tools`. |
+| Claude (cloud, your API key) | any supported OS | Anthropic API key in Keychain | yes, on send / Explain | Prompt caching enabled; model list loaded from your key; labelled `Sent to Anthropic` with token counts. |
+| OpenRouter (cloud, your API key) | any supported OS | OpenRouter API key in Keychain | yes, on send / Explain | Accesses OpenRouter's tool-capable catalog; labelled `Sent to OpenRouter`. |
+| GitHub Copilot Models (cloud, your token) | any supported OS | GitHub PAT with `models` permission in Keychain | yes, on send / Explain | Uses `models.github.ai`; labelled `Sent to GitHub`. |
+| OpenAI / Codex (cloud, your API key) | any supported OS | OpenAI API key in Keychain | yes, on send / Explain | Uses `api.openai.com/v1`; labelled `Sent to OpenAI`. |
+
+The assistant registers **213 tools**:
+- **126 read, analytics, builder, report, and operational tools**: full SimpleMDM-MCP read parity over the local cache plus documented server lookups (account logs, managed app configs, MunkiReport module routes), compact `group_by` breakdowns on `list_devices` (`assignment_group`, `os`, `model`, `platform`), payload builders (profiles and declarative JSON), `get_fleet_digest`, `get_os_rollouts`, `get_device_action_history`, `get_app_capabilities`, and `find_tools`.
+- **87 approval-gated write tools**: disabled by default behind **Settings → Assistant → Allow write actions**. Even when enabled, write tools never execute automatically—every proposed mutation renders an approval card in chat (respecting API key write permissions, showing **Profile Assignment Preview** before group profile removals, and recording **Device Action History** receipts for tracked Restart / Disable Activation Lock commands).
+
+Assistant answers render with native Markdown (`swift-markdown-ui`) and interactive Swift Charts (`ChatChartView`: automatic horizontal bars for dense/long labels, touch/drag value inspection, fullscreen expand viewers for charts and overflowing tables, and a "Building chart…" placeholder while streaming). From chat you can also run audits, generate or recap reports (PDF, Markdown, CSV, DOCX, XLSX), and open/share attached reports directly from the bubble. See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/cloud-assistant.md) for privacy details.
