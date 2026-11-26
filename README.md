@@ -8,7 +8,7 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 
 - **iOS and iPadOS (App Store):** [ReportSimpleMDM on the App Store](https://apps.apple.com/us/app/reportsimplemdm/id6760626379)
 - **macOS (Mac App Store):** [ReportSimpleMDM on the Mac App Store](https://apps.apple.com/us/app/reportsimplemdm/id6760626379?platform=mac)
-- **macOS (direct):** notarized DMG on the [Releases page](https://github.com/hov172/Report-SimpleMDM/releases/latest) if you prefer not to use the Mac App Store
+- **macOS (direct):** notarized DMG of [2.0.0 (Build 17)](https://github.com/hov172/Report-SimpleMDM/releases/tag/v2.0.0-build17). From 2.1.0 the app is larger than GitHub's 2 GiB limit per release file, so newer Mac builds ship through the Mac App Store and TestFlight only
 - **iOS (TestFlight):** [Join the public beta](https://testflight.apple.com/join/JMh5jvXY) to get builds before they reach the App Store
 
 ---
@@ -97,7 +97,7 @@ At a practical level, the current codebase supports all of the following:
 - generate, preview (paginated PDFKit), compare, and export **Reports** (Fleet Security Audit, Device Logs Audit, Inventory, Executive Summary, Configuration Backup, and Custom Reports with reusable templates) as PDF, Markdown, CSV, Word (`.docx`), and Excel (`.xlsx`)
 - schedule daily or weekly **Fleet Digests** comparing complete sync snapshots with opt-in local notifications, PDF/CSV export, and optional on-demand AI narrative
 - track frozen assignment-group cohorts against a minimum OS target and deadline in **OS Update Rollouts**, with deadline follow-up digests and spreadsheet-safe CSV exports
-- query the fleet and run approval-gated operations in the **Assistant** tab across **7 AI engines** (on-device Apple Intelligence, bundled `llama.cpp`/Qwen3, Ollama, Claude, OpenRouter, GitHub Copilot Models, and OpenAI / Codex) with **213 tools**, native Markdown rendering, interactive Swift Charts, and fullscreen table/chart expand viewers
+- query the fleet and run approval-gated operations in the **Assistant** tab across **7 AI engines** (on-device Apple Intelligence, bundled `llama.cpp`/Qwen3, Ollama, Claude, OpenRouter, GitHub Copilot Models, and OpenAI / Codex) with **214 tools**, native Markdown rendering, interactive Swift Charts, and fullscreen table/chart expand viewers
 - summarize DEP server token status on the dashboard and surface a token-expiry action item when renewal is needed
 - view the push certificate expiry date and see a prominent warning banner when it is within 30 days
 - review dashboard Action Items and customize which triage signals are shown
@@ -202,7 +202,7 @@ The dashboard is a substantial operational screen. It currently supports:
 - enrolled vs unenrolled KPI
 - enrollment status widget
 - OS version breakdown
-- recently seen devices
+- recently seen devices, each with the date and time of its last check-in
 - device posture summary
   - DEP-enrolled
   - supervised
@@ -1146,7 +1146,7 @@ Open `Settings > Assistant`. The engine picker lists seven options. Pick the fir
 | You want | Choose | Setup |
 |---|---|---|
 | No setup, nothing leaves the device | **Apple Intelligence (on device)** | Requires macOS 26 / iOS 26 with Apple Intelligence turned on in System Settings. Greyed out otherwise. |
-| Works offline on older OS versions | **Bundled model (on device)** | Nothing to configure. Qwen3 1.7B ships inside the app (about 1.1 GB). Apple Silicon Mac, Intel Mac with 16 GB, or an iPhone/iPad with 8 GB. First message loads the model; it unloads when you leave the chat. |
+| Works offline on older OS versions | **Bundled model (on device)** | Nothing to configure. Qwen3 4B ships inside the app (about 2.5 GB). Apple Silicon Mac, Intel Mac with 16 GB, or an iPhone/iPad with 8 GB. First message loads the model; it unloads when you leave the chat. |
 | Your own LLM server | **Ollama (your own server)** | Install [Ollama](https://ollama.com), run `ollama pull llama3.1` (or `qwen3`, any tool-capable model), then enter the server address (default `http://localhost:11434`) and the model name. On an iPhone, point it at your Mac's LAN address. Tap `Load models` to pick from what the server has. |
 | Best answers, you have an API key | **Claude**, **OpenRouter**, **GitHub Copilot Models**, or **OpenAI / Codex** | Paste the key or token into the labelled field on that engine's card. The eye toggle shows it while you check it. Tap `Load models` to fetch the provider's catalog and pick one, or type a model id. |
 
@@ -1169,6 +1169,8 @@ Open the `Assistant` tab. Every engine reads the same local cache that the rest 
 - `when does our push certificate expire`
 - `run a fleet security audit and summarize the critical findings`
 - `generate an inventory report for the Sales group as Excel`
+- `report of Macs without FileVault by model, with serial and OS version, as PDF`
+- `installed apps report for the Marketing group`
 - `show the latest fleet digest`
 - `which OS update rollouts are behind their deadline`
 
@@ -1177,6 +1179,9 @@ What you get back:
 - **Tables** for lists of more than a few devices, scrollable sideways on iPhone with a fullscreen expand button.
 - **Charts** (bar, line, pie) when counts are compared. Tap or drag on a chart to read values; tap the expand button for fullscreen.
 - **Report attachments** when you ask for a report. Each run produces PDF, Markdown, CSV, Word, Excel, and JSON; the share button on the attachment picks the format you named.
+- **Custom reports from plain text.** Name columns (`serial`, `model`, `OS version`, `last seen`, `FileVault`, `firewall`, `supervised`, `assignment groups` and more), filters (`without FileVault`, `not seen in 30 days`, `in the Sales group`), or a breakdown (`by model`, `per assignment group`) and the app builds that report directly, with no model involved. The reply lists what it understood and previews the first rows of each table. Installed apps, profiles, and users are listed under one heading per device. A plain `inventory report` still runs the built-in Inventory report.
+- **Vague report requests** go to the model, which builds the report with the `build_custom_report` tool. The bundled on-device model is constrained to call a report tool for such a request. If a reply to a report request ends with no report attached, a note says so.
+- **Chat history** is kept per account, with its report attachments, and is cleared with the account.
 - **A footer** on every answer naming the engine, the token count, and, for cloud engines, that the request was sent to that provider.
 
 The side panel (`Fleet brief` on Mac and iPad) shows the compact fleet summary the model sees on every turn.
@@ -1485,6 +1490,15 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 
 ## Changelog And Release History
 
+### 2.1.0 (Build 18)
+
+- **Custom reports from plain text** — name columns, filters, a scope, or a breakdown in the Assistant and the app builds that report directly, lists what it understood, and previews the tables. Requests with specifics no longer return the same built-in Inventory report.
+- **`build_custom_report` tool** — any engine can build a custom device report from loose field names (214 tools, was 213).
+- **Count tables and per-device grouping** — Custom Reports can count devices by a field and list installed apps, profiles, and users under one heading per device.
+- **Bundled model is now Qwen3 4B** (about 2.5 GB, was Qwen3 1.7B) and must call a report tool for a report request. **iOS and iPadOS 18.0 are now the minimum**; macOS is unchanged at 14.6.
+- **Recently Seen** shows each device's last check-in date and time. Assistant chat history is saved per account.
+- **Fixed** — report requests that claimed a report without attaching one, "OS version summary" being run as a report, six build warnings, and slow launch-time cache loading.
+
 ### 2.0.0 (Build 17)
 
 - **Fleet Assistant** — `Assistant` tab with 7 AI engines (Apple Intelligence, bundled Qwen3/`llama.cpp`, Ollama, Claude, OpenRouter, GitHub Copilot Models, OpenAI / Codex), 213 tools (126 read/analytics/builder/report/rollout/action-history + 87 approval-gated write tools), native Markdown (`swift-markdown-ui`), interactive Swift Charts with auto-horizontal bars and fullscreen expand, and compact `group_by` breakdowns in `list_devices`.
@@ -1748,7 +1762,7 @@ The app is production-ready for SimpleMDM fleet operators who want a native, fas
 The fleet assistant's bundled engine needs two git-ignored artifacts, pinned in `scripts/local_model.lock`:
 
 ```bash
-scripts/fetch_local_model.sh   # llama.cpp XCFramework (72 MB) and Qwen3 1.7B Q4_K_M GGUF (1.1 GB)
+scripts/fetch_local_model.sh   # llama.cpp XCFramework (72 MB) and Qwen3 4B Q4_K_M GGUF (2.5 GB)
 ```
 
 The "Verify local model" build phase fails the build with that script's name when the model is missing or its checksum differs. Simulator builds skip the framework (the release zip has no simulator slice), so the bundled engine reports itself unavailable there; use a Mac or a device. Licences for llama.cpp (MIT) and Qwen3 (Apache 2.0) ship in the app under Settings > Acknowledgements.
@@ -1760,15 +1774,15 @@ The `Assistant` tab answers questions about the cached fleet, runs audits, gener
 | Engine | Runs where | Needs | Data leaves the device | Notes |
 |---|---|---|---|---|
 | Apple Intelligence (on device) | macOS 26 / iOS 26 with Apple Intelligence enabled | nothing | no | 8,192-token window; history capped at six turns and compacted; keyword-routed tool subset (up to 8 tools). |
-| Bundled model (on device) | Apple Silicon Macs, Intel Macs with 16 GB, iPhones and iPads with 8 GB | model fetched by `scripts/fetch_local_model.sh` at build time | no | Qwen3 1.7B Q4_K_M on `llama.cpp`; ~1.1 GB in the app; loads on first message and unloads when leaving chat. |
+| Bundled model (on device) | Apple Silicon Macs, Intel Macs with 16 GB, iPhones and iPads with 8 GB | model fetched by `scripts/fetch_local_model.sh` at build time | no | Qwen3 4B Q4_K_M on `llama.cpp`; ~2.5 GB in the app; loads on first message and unloads when leaving chat. |
 | Ollama (your own server) | Your Mac or LAN server (default `http://localhost:11434`) | a running Ollama instance with a tool-capable model (e.g. `llama3.1`, `qwen3`) | only to your Ollama server | No API key; optional send-all-tools toggle; always includes `find_tools`. |
 | Claude (cloud, your API key) | any supported OS | Anthropic API key in Keychain | yes, on send / Explain | Prompt caching enabled; model list loaded from your key; labelled `Sent to Anthropic` with token counts. |
 | OpenRouter (cloud, your API key) | any supported OS | OpenRouter API key in Keychain | yes, on send / Explain | Accesses OpenRouter's tool-capable catalog; labelled `Sent to OpenRouter`. |
 | GitHub Copilot Models (cloud, your token) | any supported OS | GitHub PAT with `models` permission in Keychain | yes, on send / Explain | Uses `models.github.ai`; labelled `Sent to GitHub`. |
 | OpenAI / Codex (cloud, your API key) | any supported OS | OpenAI API key in Keychain | yes, on send / Explain | Uses `api.openai.com/v1`; labelled `Sent to OpenAI`. |
 
-The assistant registers **213 tools**:
-- **126 read, analytics, builder, report, and operational tools**: full SimpleMDM-MCP read parity over the local cache plus documented server lookups (account logs, managed app configs, MunkiReport module routes), compact `group_by` breakdowns on `list_devices` (`assignment_group`, `os`, `model`, `platform`), payload builders (profiles and declarative JSON), `get_fleet_digest`, `get_os_rollouts`, `get_device_action_history`, `get_app_capabilities`, and `find_tools`.
+The assistant registers **214 tools**:
+- **127 read, analytics, builder, report, and operational tools**: full SimpleMDM-MCP read parity over the local cache plus documented server lookups (account logs, managed app configs, MunkiReport module routes), compact `group_by` breakdowns on `list_devices` (`assignment_group`, `os`, `model`, `platform`), payload builders (profiles and declarative JSON), `get_fleet_digest`, `get_os_rollouts`, `get_device_action_history`, `get_app_capabilities`, and `find_tools`.
 - **87 approval-gated write tools**: disabled by default behind **Settings → Assistant → Allow write actions**. Even when enabled, write tools never execute automatically—every proposed mutation renders an approval card in chat (respecting API key write permissions, showing **Profile Assignment Preview** before group profile removals, and recording **Device Action History** receipts for tracked Restart / Disable Activation Lock commands).
 
 Assistant answers render with native Markdown (`swift-markdown-ui`) and interactive Swift Charts (`ChatChartView`: automatic horizontal bars for dense/long labels, touch/drag value inspection, fullscreen expand viewers for charts and overflowing tables, and a "Building chart…" placeholder while streaming). From chat you can also run audits, generate or recap reports (PDF, Markdown, CSV, DOCX, XLSX), and open/share attached reports directly from the bubble. See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/cloud-assistant.md) for privacy details.
