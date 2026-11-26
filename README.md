@@ -1099,6 +1099,7 @@ Step by step:
 4. In `MunkiReport Base URL`, enter the MunkiReport site root.
    Example for rewrite-enabled routing: `https://munkireport.example.com`
    Example for non-rewrite routing: `https://munkireport.example.com/index.php?`
+   The address must use `https://`. The module requests carry your API key, so the app does not load MunkiReport data over plain `http://` (except from `localhost`).
 5. Leave `Module Path Prefix` set to `/module/simplemdm` unless your MunkiReport deployment is intentionally customized.
 6. Choose one MunkiReport authentication method.
    Sync-token auth (recommended, module `f8dd079` or later): `Auth Header Name` is fixed to `X-SIMPLEMDM-API-KEY` and `Auth Header Value` can stay blank — the app sends your SimpleMDM API key automatically, and the module accepts it on its read-only dashboard routes. No auth header-name configuration is needed for this path.
@@ -1181,7 +1182,9 @@ What you get back:
 - **Report attachments** when you ask for a report. Each run produces PDF, Markdown, CSV, Word, Excel, and JSON; the share button on the attachment picks the format you named.
 - **Custom reports from plain text.** Name columns (`serial`, `model`, `OS version`, `last seen`, `FileVault`, `firewall`, `supervised`, `assignment groups` and more), filters (`without FileVault`, `not seen in 30 days`, `in the Sales group`), or a breakdown (`by model`, `per assignment group`) and the app builds that report directly, with no model involved. The reply lists what it understood and previews the first rows of each table. Installed apps, profiles, and users are listed under one heading per device. A plain `inventory report` still runs the built-in Inventory report.
 - **Vague report requests** go to the model, which builds the report with the `build_custom_report` tool. The bundled on-device model is constrained to call a report tool for such a request. If a reply to a report request ends with no report attached, a note says so.
-- **Chat history** is kept per account, with its report attachments, and is cleared with the account.
+- **Chat history** is kept per account, with its report attachments, and is cleared with the account. Each chat bubble has a menu to share that message or delete it from the history.
+- **Write audit trail**: every assistant action you approve or cancel is saved per account and survives restarts, clearing the chat, and deleting a bubble. Ask for the write audit log.
+- **Cloud engines never receive secrets from fleet configuration**: passwords, tokens, keys, and certificate data in profiles, declarations, scripts, and managed app configs are redacted before they are sent. On-device engines see the full content.
 - **A footer** on every answer naming the engine, the token count, and, for cloud engines, that the request was sent to that provider.
 
 The side panel (`Fleet brief` on Mac and iPad) shows the compact fleet summary the model sees on every turn.
@@ -1489,6 +1492,14 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 | Webhook | An HTTP endpoint that SimpleMDM notifies when specific MDM events occur |
 
 ## Changelog And Release History
+
+### 2.1.1 (Build 19)
+
+- **Security** — accounts no longer share a fleet cache (the first launch re-syncs once); an approved assistant action runs only on the connection it was proposed on; cloud engines get fleet configuration with passwords, tokens, keys, and certificate data redacted; MunkiReport requests require `https://`; deleting an account removes its Keychain items; CSV exports are safe to open in a spreadsheet.
+- **Fixed** — a change request such as running a script is sent once and never retried after a network failure; a refused per-device list no longer counts as "none installed"; the assistant's tool-call limit applies before a tool runs; building a report no longer blocks the interface on a large fleet.
+- **Write audit trail** — every assistant action you approve or cancel is saved per account and survives restarts and clearing the chat.
+- **Inventory report** — apps and profiles assigned through assignment groups are compared with what is installed; shows when SimpleMDM holds a FileVault recovery key.
+- **Chat** — share or delete a single chat message from its menu.
 
 ### 2.1.0 (Build 18)
 
