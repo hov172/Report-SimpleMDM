@@ -107,7 +107,6 @@ At a practical level, the current codebase supports all of the following:
 - create and manage custom configuration profiles
 - create and manage custom declarations
 - create, edit, and delete custom attribute definitions
-- create, edit, and delete webhooks
 - browse account-level MDM logs with search and CSV export
 - manage enrollments, DEP servers, push certificates, managed app configs, scripts, and script jobs
 - view account details including name, email, push certificate status, and ABM connection state
@@ -223,7 +222,6 @@ The dashboard is a substantial operational screen. It currently supports:
   - assignment groups
   - apps
   - custom declarations
-  - webhooks
   - push certificate
 
 When optional module data is available, the dashboard adds a labeled **MunkiReport Insights** section (a header with a MODULE tag and the configured server host) grouping the module-only widgets:
@@ -679,15 +677,9 @@ The notification system polls the job status every 10 seconds for up to 10 minut
 
 ### 18. Webhooks
 
-Webhooks are fully managed in the app.
+SimpleMDM's API has no webhook endpoints (`/webhooks` answers 404), so the app cannot list, create, edit or delete webhooks. See SimpleMDM's API documentation for the events it can send.
 
-The Webhook Manager in Admin Center supports:
-
-- list all configured webhooks with name and URL
-- create a new webhook with a URL and optional name
-- edit an existing webhook's URL or name
-- delete a webhook with a confirmation dialog
-- a reference list of all supported SimpleMDM event types
+Admin Center → Webhooks Guide is a read-only reference of the supported event types. The Assistant's `verify_webhook_payload` tool checks a webhook body you paste in.
 
 ### 19. Account Management
 
@@ -781,7 +773,7 @@ The Admin Center also includes direct entry points into:
 - Full API Explorer
 - Custom Declarations
 - Custom Attributes
-- Webhook Manager
+- Webhooks Guide
 - Device Action History
 - Account Logs
 
@@ -922,7 +914,6 @@ The direct SimpleMDM path is responsible for:
   - enrollments
   - DEP servers
   - script jobs
-  - webhooks
   - push certificate
 - loading per-device detail
 - loading per-device subresources
@@ -1182,6 +1173,7 @@ What you get back:
 - **Report attachments** when you ask for a report. Each run produces PDF, Markdown, CSV, Word, Excel, and JSON; the share button on the attachment picks the format you named.
 - **Custom reports from plain text.** Name columns (`serial`, `model`, `OS version`, `last seen`, `FileVault`, `firewall`, `supervised`, `assignment groups` and more), filters (`without FileVault`, `not seen in 30 days`, `in the Sales group`), or a breakdown (`by model`, `per assignment group`) and the app builds that report directly, with no model involved. The reply lists what it understood and previews the first rows of each table. Installed apps, profiles, and users are listed under one heading per device. A plain `inventory report` still runs the built-in Inventory report.
 - **Vague report requests** go to the model, which builds the report with the `build_custom_report` tool. The bundled on-device model is constrained to call a report tool for such a request. If a reply to a report request ends with no report attached, a note says so.
+- **Model switch**: the chat menu's Model item changes the engine (and the Claude model) without leaving the chat; cloud engines still show the cloud notice first.
 - **Chat history** is kept per account, with its report attachments, and is cleared with the account. Each chat bubble has a menu to share that message or delete it from the history.
 - **Write audit trail**: every assistant action you approve or cancel is saved per account and survives restarts, clearing the chat, and deleting a bubble. Ask for the write audit log.
 - **Cloud engines never receive secrets from fleet configuration**: passwords, tokens, keys, and certificate data in profiles, declarations, scripts, and managed app configs are redacted before they are sent. On-device engines see the full content.
@@ -1257,7 +1249,6 @@ Use `Settings > Saved Accounts` to register each SimpleMDM API key as a named ac
 | Apps catalog | SimpleMDM `GET/POST/PATCH/DELETE /apps` |
 | Munki pkginfo | SimpleMDM `GET/DELETE /apps/{id}/munki_pkginfo` |
 | Custom attributes (definitions) | SimpleMDM `GET/POST/PATCH/DELETE /custom_attributes` |
-| Webhooks | SimpleMDM `GET/POST/PATCH/DELETE /webhooks` |
 | Account info | SimpleMDM `GET/PATCH /account` |
 | Account logs | SimpleMDM `GET /logs` |
 | Push certificate | SimpleMDM `GET/PATCH /push_certificate` |
@@ -1292,7 +1283,7 @@ Use `Settings > Saved Accounts` to register each SimpleMDM API key as a named ac
 | Custom configuration profile CRUD | Yes |
 | Custom declaration CRUD | Yes |
 | Custom attribute definitions CRUD | Yes |
-| Webhook CRUD | Yes |
+| Webhook CRUD | No (SimpleMDM has no webhook API) |
 | Enrollment management | Yes |
 | DEP server management | Yes |
 | Push certificate management | Yes |
@@ -1375,7 +1366,6 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 - `/push_certificate/scsr` — GET
 - `/script_jobs` — GET, POST, DELETE
 - `/scripts` — GET, POST, PATCH, DELETE
-- `/webhooks` — GET, POST, PATCH, DELETE
 
 ## Failure Modes And Fallback Behavior
 
@@ -1492,6 +1482,12 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 | Webhook | An HTTP endpoint that SimpleMDM notifies when specific MDM events occur |
 
 ## Changelog And Release History
+
+### 2.1.3 (Build 23)
+
+- **No more fake webhook screens** — SimpleMDM has no webhook API, so the Webhook Manager, its dashboard count and card, the "disabled webhooks" signal and a request that always failed on every sync are gone. Admin Center now has a read-only Webhooks Guide listing the events SimpleMDM documents. The app-only `list_webhooks` assistant tool is removed (224 tools).
+- **Switch the Assistant's engine from the chat menu** — the Model item next to Clear chat shows the current engine and model and switches without opening Settings. Cloud engines keep the privacy notice, and nothing can be switched while a reply is streaming or a write action is waiting for your answer.
+- **Review fixes** — a 429 cooldown now covers every request; cloud redaction catches a credential under any key; a rollout approval is bound to the device list you saw; a name that matches several items asks for a unique ID; failed report deletions are shown.
 
 ### 2.1.2 (Build 22)
 
@@ -1692,7 +1688,7 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 - dynamic group filter criteria display in assignment group detail
 - group_type (Static/Dynamic) capsule badge in assignment group list
 - Munki pkginfo view and delete per app catalog entry
-- webhook CRUD with event type reference
+- webhook event type reference
 - account management view with edit support
 - push certificate expiry banner on dashboard (warning <30 days, critical <7 days)
 - dashboard Action Items with per-item visibility settings
@@ -1723,7 +1719,7 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 - [x] Settings → Dashboard Widgets → Compact Dashboard Layout can be toggled independently from Action Items
 - [x] Settings → Dashboard Widgets → Auto-Hide Unenrolled KPI When Zero hides or shows the zero-count card
 - [x] Admin Center → Custom Attributes → create, edit, delete
-- [x] Admin Center → Webhook Manager → create, edit, delete
+- [x] Admin Center → Webhooks Guide (read-only event types)
 - [x] Admin Center → Account Logs → loads, search works, CSV export
 - [x] Settings → Account → shows name, email, ABM status, cert expiry
 - [x] Settings → Saved Accounts → save, switch, delete
@@ -1805,8 +1801,8 @@ The `Assistant` tab answers questions about the cached fleet, runs audits, gener
 | GitHub Copilot Models (cloud, your token) | any supported OS | GitHub PAT with `models` permission in Keychain | yes, on send / Explain | Uses `models.github.ai`; labelled `Sent to GitHub`. |
 | OpenAI / Codex (cloud, your API key) | any supported OS | OpenAI API key in Keychain | yes, on send / Explain | Uses `api.openai.com/v1`; labelled `Sent to OpenAI`. |
 
-The assistant registers **225 tools**:
-- **127 read, analytics, builder, report, and operational tools**: full SimpleMDM-MCP read parity over the local cache plus documented server lookups (account logs, managed app configs, MunkiReport module routes), compact `group_by` breakdowns on `list_devices` (`assignment_group`, `os`, `model`, `platform`), payload builders (profiles and declarative JSON), `get_fleet_digest`, `get_os_rollouts`, `get_device_action_history`, `get_app_capabilities`, and `find_tools`.
+The assistant registers **224 tools**:
+- **126 read, analytics, builder, report, and operational tools**: full SimpleMDM-MCP read parity over the local cache plus documented server lookups (account logs, managed app configs, MunkiReport module routes), compact `group_by` breakdowns on `list_devices` (`assignment_group`, `os`, `model`, `platform`), payload builders (profiles and declarative JSON), `get_fleet_digest`, `get_os_rollouts`, `get_device_action_history`, `get_app_capabilities`, and `find_tools`.
 - **98 approval-gated write tools**: disabled by default behind **Settings → Assistant → Allow write actions**. Even when enabled, write tools never execute automatically—every proposed mutation renders an approval card in chat (respecting API key write permissions, showing **Profile Assignment Preview** before group profile removals, and recording **Device Action History** receipts for tracked Restart / Disable Activation Lock commands).
 
 Assistant answers render with native Markdown (`swift-markdown-ui`) and interactive Swift Charts (`ChatChartView`: automatic horizontal bars for dense/long labels, touch/drag value inspection, fullscreen expand viewers for charts and overflowing tables, and a "Building chart…" placeholder while streaming). From chat you can also run audits, generate or recap reports (PDF, Markdown, CSV, DOCX, XLSX), and open/share attached reports directly from the bubble. See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/cloud-assistant.md) for privacy details.
