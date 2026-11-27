@@ -1493,10 +1493,17 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 
 ## Changelog And Release History
 
-### 2.1.1 (Build 19)
+### 2.1.1 (Build 21)
+
+- **Data stays correct** — a failed or cancelled sync keeps the previous data instead of emptying lists; device counts no longer drop during a sync; the dashboard is never replaced by a filtered Devices search; answers that arrive after you switch account are dropped, so one account's fleet is never shown or cached under another; "Recently Seen" and the Assistant refresh after every sync and when you return to the app; "Updated" and "Data as of" show when data was fetched.
+- **Profiles, script jobs, new devices** — profile-to-group links are read from the profile record and cover every profile type; a script job's devices show their own status, exit code and output; a created device is explained as awaiting enrollment with its enrollment link; the Inventory report says when assigned profiles cannot be listed.
+- **Security** — MunkiReport requests never follow redirects; script source, job output, webhook tokens, logs, MunkiReport output and profile attributes are redacted before they reach a cloud model; a failing automatic refresh retries at most every 5 minutes.
+- **Easier to press** — every admin row, tool card and list row takes the tap from anywhere on it and shows an arrow when it opens something; small icon buttons have a 44 pt target; bar chart labels no longer overlap their bars.
+
+### 2.1.1 (Build 20)
 
 - **Security** — accounts no longer share a fleet cache (the first launch re-syncs once); an approved assistant action runs only on the connection it was proposed on; cloud engines get fleet configuration with passwords, tokens, keys, and certificate data redacted; MunkiReport requests require `https://`; deleting an account removes its Keychain items; CSV exports are safe to open in a spreadsheet.
-- **Fixed** — a change request such as running a script is sent once and never retried after a network failure; a refused per-device list no longer counts as "none installed"; the assistant's tool-call limit applies before a tool runs; building a report no longer blocks the interface on a large fleet.
+- **Fixed** — Recently Seen no longer shows the same devices: the fleet refreshes when the app returns to the foreground with a stale device list; the Assistant now refreshes its fleet data after every sync; a change request such as running a script is sent once and never retried after a network failure; a refused per-device list no longer counts as "none installed"; the assistant's tool-call limit applies before a tool runs; building a report no longer blocks the interface on a large fleet.
 - **Write audit trail** — every assistant action you approve or cancel is saved per account and survives restarts and clearing the chat.
 - **Inventory report** — apps and profiles assigned through assignment groups are compared with what is installed; shows when SimpleMDM holds a FileVault recovery key.
 - **Chat** — share or delete a single chat message from its menu.
