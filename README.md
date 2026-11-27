@@ -1493,6 +1493,12 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 
 ## Changelog And Release History
 
+### 2.1.2 (Build 22)
+
+- **No more "request failed 429" on a first open** — a request now waits out SimpleMDM's rate limit (up to eight times, honoring Retry-After, never over a minute) with every request held for the wait, instead of failing after three quick tries.
+- **The Assistant can do more** — create, update and delete OS update rollouts; save and delete report templates; delete report runs; assign and unassign profiles on device groups; delete Munki pkginfo. Editing an enrollment or a managed app config has no SimpleMDM API, so there is no tool for them.
+- **Secrets by shape** — text sent to a cloud model is also redacted by the shape of the value (private key blocks, JWTs, Bearer credentials, well-known token formats), whatever the field is called.
+
 ### 2.1.1 (Build 21)
 
 - **Data stays correct** — a failed or cancelled sync keeps the previous data instead of emptying lists; device counts no longer drop during a sync; the dashboard is never replaced by a filtered Devices search; answers that arrive after you switch account are dropped, so one account's fleet is never shown or cached under another; "Recently Seen" and the Assistant refresh after every sync and when you return to the app; "Updated" and "Data as of" show when data was fetched.
@@ -1799,8 +1805,8 @@ The `Assistant` tab answers questions about the cached fleet, runs audits, gener
 | GitHub Copilot Models (cloud, your token) | any supported OS | GitHub PAT with `models` permission in Keychain | yes, on send / Explain | Uses `models.github.ai`; labelled `Sent to GitHub`. |
 | OpenAI / Codex (cloud, your API key) | any supported OS | OpenAI API key in Keychain | yes, on send / Explain | Uses `api.openai.com/v1`; labelled `Sent to OpenAI`. |
 
-The assistant registers **214 tools**:
+The assistant registers **225 tools**:
 - **127 read, analytics, builder, report, and operational tools**: full SimpleMDM-MCP read parity over the local cache plus documented server lookups (account logs, managed app configs, MunkiReport module routes), compact `group_by` breakdowns on `list_devices` (`assignment_group`, `os`, `model`, `platform`), payload builders (profiles and declarative JSON), `get_fleet_digest`, `get_os_rollouts`, `get_device_action_history`, `get_app_capabilities`, and `find_tools`.
-- **87 approval-gated write tools**: disabled by default behind **Settings → Assistant → Allow write actions**. Even when enabled, write tools never execute automatically—every proposed mutation renders an approval card in chat (respecting API key write permissions, showing **Profile Assignment Preview** before group profile removals, and recording **Device Action History** receipts for tracked Restart / Disable Activation Lock commands).
+- **98 approval-gated write tools**: disabled by default behind **Settings → Assistant → Allow write actions**. Even when enabled, write tools never execute automatically—every proposed mutation renders an approval card in chat (respecting API key write permissions, showing **Profile Assignment Preview** before group profile removals, and recording **Device Action History** receipts for tracked Restart / Disable Activation Lock commands).
 
 Assistant answers render with native Markdown (`swift-markdown-ui`) and interactive Swift Charts (`ChatChartView`: automatic horizontal bars for dense/long labels, touch/drag value inspection, fullscreen expand viewers for charts and overflowing tables, and a "Building chart…" placeholder while streaming). From chat you can also run audits, generate or recap reports (PDF, Markdown, CSV, DOCX, XLSX), and open/share attached reports directly from the bubble. See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/cloud-assistant.md) for privacy details.
