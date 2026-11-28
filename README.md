@@ -111,7 +111,7 @@ At a practical level, the current codebase supports all of the following:
 - track frozen assignment-group cohorts against a minimum OS target and deadline in **OS Update Rollouts**, with deadline follow-up digests and spreadsheet-safe CSV exports
 - query the fleet and run approval-gated operations in the **Assistant** tab across **7 AI engines** (on-device Apple Intelligence, bundled `llama.cpp`/Qwen3, Ollama, Claude, OpenRouter, GitHub Copilot Models, and OpenAI / Codex) with **224 tools**, native Markdown rendering, interactive Swift Charts, and fullscreen table/chart expand viewers
 - summarize DEP server token status on the dashboard and surface a token-expiry action item when renewal is needed
-- view the push certificate expiry date and see a prominent warning banner when it is within 30 days
+- view the push certificate expiry date and see a prominent warning banner when it expires in fewer than 30 days
 - review dashboard Action Items and customize which triage signals are shown
 - create and manage assignment groups, including viewing filter criteria for dynamic groups
 - set custom attribute values on assignment groups
@@ -197,7 +197,7 @@ The project is a shared SwiftUI app for Apple platforms. Minimum versions: iOS a
 Current platform-specific behavior includes:
 
 - iOS background refresh scheduling on physical devices
-- iOS local push notifications for script job completion
+- local notifications for script job completion (not iOS-only)
 - compact iPhone layouts for dashboard and inventory screens
 - macOS split-view device detail with a dedicated actions sidebar
 - visionOS shares the same SwiftUI codebase, with iOS-only behaviors compiled out where the platform does not support them
@@ -242,7 +242,7 @@ When optional module data is available, the dashboard adds a labeled **MunkiRepo
 - compliance
 - supplemental overview
 - AppleCare coverage
-- MCP Findings — severity totals (danger/warning/info) plus the 5 most recent active findings (severity, category, serial), with a "+N more in MunkiReport" overflow line, fed by the module's token-readable `get_mcp_findings?limit=25` route
+- MCP Findings — severity totals (danger/warning/info) plus the 5 most recent active findings (severity, category, serial), with a "+N more" overflow line and a "View All Findings" link to the in-app findings list, fed by the module's token-readable `get_mcp_findings?limit=25` route
 - Findings Timeline — a 30-day New vs Resolved line chart (Swift Charts; New in the warning/orange color, Resolved in mint), fed by `get_mcp_finding_timeline?days=30`, with an empty state ("No findings activity in the last 30 days.") when there's nothing to show
 - Top Devices by Findings — a ranked list (max 10) of devices by weighted active-finding risk (score = 3×danger + 2×warning + 1×info) with per-severity count badges and the score, fed by `top_devices` in `get_mcp_finding_stats`
 
@@ -307,7 +307,7 @@ The device list has a selection mode. When active:
 
 - tap any device row to toggle it into the selection set
 - a bottom action bar appears showing the count of selected devices
-- available bulk actions: Lock, Sync, Push Apps, Disable Activation Lock, and Send Message (Send Message opens a sheet to compose one message for all selected devices)
+- available bulk actions: Lock, Sync, Push Apps, Restart (confirmation-gated), Disable Activation Lock (confirmation-gated), and Send Message (Send Message opens a sheet to compose one message for all selected devices)
 - the bulk action bar scrolls horizontally so actions never overflow on narrow screens
 - all selected devices receive the action concurrently via a task group
 - exiting selection mode or completing an action clears the selection
@@ -335,8 +335,8 @@ Current device detail behavior includes:
 
 - a dedicated overview experience
 - an inventory view
-- a custom attributes tab
-- a script jobs tab
+- an Attributes tab
+- a Jobs tab
 - device actions
 - automatic live detail loading for enrolled devices
 - graceful handling for non-enrolled devices
@@ -355,7 +355,7 @@ The overview and inventory flows expose:
 
 #### Custom Attributes Tab
 
-The custom attributes tab shows all attribute definitions from the account. For each attribute:
+The Attributes tab shows all attribute definitions from the account. For each attribute:
 
 - the current value for this device is shown
 - an inline text field allows editing the value
@@ -364,7 +364,7 @@ The custom attributes tab shows all attribute definitions from the account. For 
 
 #### Script Jobs Tab
 
-The script jobs tab shows recent script jobs associated with this device and allows running new ones.
+The Jobs tab shows recent script jobs associated with this device and allows running new ones.
 
 - all script jobs linked to this device are listed with status badges and timestamps
 - status badge colors: mint for completed, amber for pending, red for failed
@@ -458,6 +458,7 @@ Advanced action coverage includes:
 - update OS
 - enable remote desktop
 - disable remote desktop
+- enable bluetooth
 - disable bluetooth
 - set time zone
 
@@ -644,7 +645,7 @@ Current enrollment workflows include:
 - inspect enrollment details
 - send invitations by email or phone
 - review enrollment URL and auth flags
-- delete enrollments with confirmation
+- delete enrollments after typing DELETE to confirm
 
 ### 15. DEP Servers
 
@@ -683,7 +684,7 @@ Current capabilities include:
 - cancel script jobs
 - inspect job results and output
 - run a script directly from device detail
-- receive a local push notification when a job reaches a terminal status (completed, failed, cancelled)
+- receive a local push notification when a job reaches a terminal status (completed, failed, cancelled, error)
 
 The notification system polls the job status every 10 seconds for up to 10 minutes. Notification permission is requested automatically the first time a script job is created.
 
@@ -731,7 +732,7 @@ From Settings → Saved Accounts:
 - all non-secret connection metadata (backend mode, URLs, action names) is stored in UserDefaults
 - tap any saved account to switch to it — the service layer resets and reloads automatically
 - the active account is marked with a badge
-- swipe to delete removes the account profile and its keychain entries
+- the trash button in the Delete Account card removes a saved account profile, its keychain entries and its Assistant memory and audit files (no confirmation prompt)
 
 Switching accounts is non-destructive. The previously active connection state is preserved in its account profile and can be switched back to at any time.
 
@@ -777,8 +778,8 @@ The Admin Center also includes direct entry points into:
 - Profile Manager
 - Enrollment Manager
 - DEP Server Manager
-- Push Certificate Manager
-- Managed App Config Manager
+- Push Certificate
+- Managed App Configs
 - Scripts & Jobs
 - Assignment Group Manager
 - Create Device
@@ -864,7 +865,8 @@ The code explicitly models these permission domains:
 - `Profiles: write`
 - `Apps: write`
 - `Managed App Configs: write`
-- `Device Secrets` (only when `Show Device Secrets` is enabled)
+
+The `Show Device Secrets` toggle separately needs the `Device Secrets` permission on the API key; it is not a modeled write domain.
 
 Current permission behavior includes:
 
@@ -990,8 +992,8 @@ During initial load, the service minimizes time-to-first-usable-screen:
 
 1. Check whether the current connection is configured.
 2. Check whether a cached launch snapshot exists for the current configuration fingerprint.
-3. If a fresh cached snapshot exists, publish it immediately.
-4. Start or resume live SimpleMDM device loading.
+3. Publish any cached snapshot immediately, whether it is fresh, stale or partial. If it is fresh and complete, device paging is skipped and only resources and module data revalidate.
+4. Otherwise start or resume live SimpleMDM device loading. Device paging, primary dashboard resources and module enrichment run in parallel, not one after another.
 5. Publish the first useful device page as soon as possible.
 6. Continue remaining device pagination in the background.
 7. Load primary dashboard resources.
@@ -1050,7 +1052,7 @@ When a sync session goes idle, it is finalized into a summary that records:
 - error count
 - last error
 - host
-- source (manual or background)
+- source (for example Startup, Startup Incremental, Foreground, Manual or Background)
 
 Recent summaries are stored locally and surfaced in Settings and dashboard sync-health views.
 
@@ -1060,7 +1062,7 @@ ReportSimpleMDM is one of three companion projects. Each works on its own; toget
 
 | Project | What it is | Talks to |
 |---|---|---|
-| [ReportSimpleMDM](https://github.com/hov172/ReportSimpleMDM) (this app) | Native macOS / iOS / iPadOS client | SimpleMDM API directly; optionally the MunkiReport module (read-only) |
+| [ReportSimpleMDM](https://github.com/hov172/ReportSimpleMDM) (this app) | Native macOS / iOS / iPadOS client | SimpleMDM API directly; optionally the MunkiReport module (dashboard reads; with write actions on, the assistant can also push findings or request a module sync, only after you approve) |
 | [SimpleMDM-MunkiReport](https://github.com/hov172/SimpleMDM-MunkiReport) | A MunkiReport module that syncs SimpleMDM data into MunkiReport and exposes `/module/simplemdm/...` routes | SimpleMDM API (its own sync); serves the app and the MCP |
 | [SimpleMDM-MCP](https://github.com/hov172/SimpleMDM-MCP) | An MCP server that lets Claude or any MCP client query and act on SimpleMDM in natural language | SimpleMDM API directly; optionally the MunkiReport module (reads data, writes findings) |
 
@@ -1099,7 +1101,7 @@ Step by step:
 1. Open the app and go to `Settings > Server & API`.
 2. Change `Backend Mode` to `SimpleMDM + MunkiReport Module`.
 3. Enter your normal `SimpleMDM API Key`.
-4. In `MunkiReport Base URL`, enter the MunkiReport site root.
+4. In `MunkiReport Server Address`, enter the MunkiReport site root.
    Example for rewrite-enabled routing: `https://munkireport.example.com`
    Example for non-rewrite routing: `https://munkireport.example.com/index.php?`
    The address must use `https://`. The module requests carry your API key, so the app does not load MunkiReport data over plain `http://` (except from `localhost`).
@@ -1115,7 +1117,7 @@ Step by step:
 
 Quickest safe default:
 
-- `MunkiReport Base URL`: your MunkiReport root
+- `MunkiReport Server Address`: your MunkiReport root
 - `Module Path Prefix`: `/module/simplemdm`
 - `Auth Header Name`: fixed to `X-SIMPLEMDM-API-KEY` (sync-token auth requires module `f8dd079`+)
 - `Auth Header Value`: blank (the app substitutes your SimpleMDM API key)
@@ -1134,7 +1136,7 @@ Quickest safe default:
 To add a second SimpleMDM account:
 
 1. Go to `Settings > Saved Accounts`.
-2. Enter a display name and tap Save Current.
+2. Enter a display name and tap Save as Account.
 3. Change the API key in `Settings > Server & API` to the new account.
 4. Return to `Settings > Saved Accounts` and save again with a different name.
 5. Tap either account row to switch between them instantly.
@@ -1199,8 +1201,8 @@ Write tools are off by default. Turn on `Settings > Assistant > Allow write acti
 
 1. Ask for the change, for example `move SN12345 to the Finance group` or `push the Wi-Fi profile to the Sales group`.
 2. The assistant replies with an **approval card** showing exactly what will be sent to SimpleMDM.
-3. Tap **Approve** to run it, or dismiss it. Destructive actions (wipe, erase, lock) ask a second time.
-4. Removing a profile from a group shows the **Profile Assignment Preview** on the card first, so you can see which devices would lose it.
+3. Tap **Approve** to run it, or dismiss it. Destructive actions (wipe, unenroll, delete, clear or rotate passwords) need an extra "I understand this cannot be undone" toggle before Approve. Lock does not.
+4. Removing a profile from a group shows a **Preview removal** button on the card first, which opens the Profile removal preview, so you can see which devices would lose it.
 5. Restart and Disable Activation Lock requests record a receipt in **Device Action History** before they are sent.
 
 Write cards respect your API key's permissions. If SimpleMDM refuses a path with 401 or 403, the assistant remembers it and refuses later proposals on that path with the reason.
@@ -1213,7 +1215,7 @@ A digest compares two complete syncs and reports what changed: devices added or 
 2. Choose `Cadence` (daily or weekly) and `Scope` (whole fleet or one assignment group).
 3. Tick the change categories you care about.
 4. Turn on `Notify when there are changes`. The app asks for notification permission at that moment, not at launch. `Also notify when all clear` sends a quiet "no changes" note.
-5. Tap `Compare now` to build the first baseline. From then on the digest runs after each background refresh on iOS and on every foreground activation on macOS.
+5. Tap `Compare now` to build the first baseline. From then on the digest runs after each background refresh on iOS and when the app becomes active (on iOS and macOS), at most once per cadence window.
 
 Read digests under `Admin > Fleet Digest`. Each one exports to PDF or CSV. With `AI narrative` on, an `Explain this digest` button runs one tool-free turn on your selected engine over the stored events only; it never runs in the background and cloud engines need the same one-time privacy acceptance.
 
@@ -1263,7 +1265,7 @@ Use `Settings > Saved Accounts` to register each SimpleMDM API key as a named ac
 | Custom attributes (definitions) | SimpleMDM `GET/POST/PATCH/DELETE /custom_attributes` |
 | Account info | SimpleMDM `GET/PATCH /account` |
 | Account logs | SimpleMDM `GET /logs` |
-| Push certificate | SimpleMDM `GET/PATCH /push_certificate` |
+| Push certificate | SimpleMDM `GET/PUT /push_certificate` |
 | Dashboard enrichment | MunkiReport `simplemdm` module routes |
 
 ## Capability Matrix
@@ -1336,6 +1338,9 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 - `/apps` — GET, POST, PATCH, DELETE
 - `/apps/{id}/installs` — GET
 - `/apps/{id}/munki_pkginfo` — GET, DELETE
+- `/apps/{id}/managed_configs` — GET, POST
+- `/apps/{id}/managed_configs/{id}` — DELETE
+- `/apps/{id}/managed_configs/push` — POST
 - `/assignment_groups` — GET, POST, PATCH, DELETE
 - `/assignment_groups/{id}/apps/{id}` — POST, DELETE
 - `/assignment_groups/{id}/clone` — POST
@@ -1353,18 +1358,21 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 - `/custom_declarations/{id}/download` — GET
 - `/dep_servers` — GET
 - `/dep_servers/{id}/dep_devices` — GET
+- `/dep_servers/{id}/dep_devices/{id}` — GET
 - `/dep_servers/{id}/sync` — POST
 - `/devices` — GET, POST, PATCH, DELETE (`?show_secrets=true` on GET when `Show Device Secrets` is enabled)
 - `/devices/{id}/custom_attribute_values` — GET
 - `/devices/{id}/custom_attribute_values/{key}` — PUT
 - `/devices/{id}/installed_apps` — GET
-- `/devices/{id}/installed_apps/{id}` — GET, DELETE
+- `/installed_apps/{id}` — GET, DELETE
+- `/installed_apps/{id}/update` — POST
+- `/installed_apps/{id}/request_management` — POST
 - `/devices/{id}/lost_mode` — POST, DELETE
 - `/devices/{id}/lost_mode/play_sound` — POST
 - `/devices/{id}/lost_mode/update_location` — POST
 - `/devices/{id}/profiles` — GET
-- `/devices/{id}/users` — GET, DELETE
-- `/devices/{id}/users/{id}` — GET, DELETE
+- `/devices/{id}/users` — GET
+- `/devices/{id}/users/{id}` — DELETE
 - `/devices/{id}/*action*` — POST (all device action endpoints)
 - `/enrollments` — GET
 - `/enrollments/{id}/invitations` — POST
@@ -1374,9 +1382,10 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 - `/profiles` — GET
 - `/profiles/{id}/devices/{id}` — POST, DELETE
 - `/profiles/{id}/device_groups/{id}` — POST, DELETE
-- `/push_certificate` — GET, PATCH
+- `/push_certificate` — GET, PUT
 - `/push_certificate/scsr` — GET
 - `/script_jobs` — GET, POST, DELETE
+- `/script_jobs/{id}` — GET
 - `/scripts` — GET, POST, PATCH, DELETE
 
 ## Failure Modes And Fallback Behavior
@@ -1384,7 +1393,7 @@ The app covers the following SimpleMDM API v1.55 endpoint groups:
 | Scenario | Behavior |
 |----------|----------|
 | No network on launch | Cached snapshot renders if available; refresh banner shown |
-| API key invalid (401) | Service clears state; setup prompt shown |
+| API key invalid (401) | The request fails with "The API key or module credentials were rejected."; nothing is cleared automatically |
 | Permission denied (403) | Specific permission domain disabled; action UI reflects this |
 | Rate limited (429) | Service retries with backoff |
 | Conflict (409) | Error surfaced inline without crashing state |
@@ -1405,7 +1414,7 @@ None currently known. (Fixed in 1.5.5: dashboard count corruption from active se
 
 ## Security And Secrets
 
-All credentials are stored exclusively in the system data-protection keychain (`kSecUseDataProtectionKeychain`):
+All credentials are stored in the system data-protection keychain (`kSecUseDataProtectionKeychain`); unsigned builds fall back to the legacy login keychain:
 
 - SimpleMDM API key — per-account, namespaced by UUID
 - MunkiReport auth header value — per-account, namespaced by UUID
