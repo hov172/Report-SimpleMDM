@@ -25,20 +25,32 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 
 ## Screenshots
 
-### Dashboard — KPI & Action Items
-![Dashboard KPI bar, Action Items, Enrollment Status, and OS Versions breakdown](Images/screen1.jpg)
+All screenshots use the built-in sample data (Settings, "Try with sample data"). Nothing in them is a real device.
 
-### Dashboard — Device Posture & Resources
-![Device Posture stats and Live API Resource cards](Images/screen2.jpg)
+### Dashboard
+![Dashboard with KPI cards, Action Items, Enrollment Status, and OS Versions](Images/mac-01-dashboard.jpg)
 
 ### Device Inventory
-![Device list with status and OS filters, search bar, serial, and last-seen timestamps](Images/screen3.jpg)
+![Device list with status and OS filters, search, serial, security state, and last-seen times](Images/mac-02-devices.jpg)
+
+### Device Detail
+![A MacBook Pro with battery, storage, security checks, hardware details, and device actions](Images/mac-03-device-detail.jpg)
+
+### Fleet Assistant
+![Fleet Assistant with a fleet brief, suggested questions, and a model switch](Images/mac-04-assistant.jpg)
+
+### Fleet Audit
+![Fleet Audit summary with danger, warning, and info counts and recommended fixes](Images/mac-06-fleet-audit.jpg)
 
 ### Admin Center
-![Admin Center showing API coverage counts and runnable endpoint presets](Images/screen4.jpg)
+![Admin Center with API coverage counts, operation groups, and the tools list](Images/mac-07-admin-center.jpg)
 
-### Settings
-![Settings menu listing Admin Center, Assignment Groups, App Catalog, Profiles, Enrollments, DEP Servers, Push Certificate, and Managed App Configs](Images/screen5.jpg)
+### On iPhone
+<p>
+  <img src="Images/iphone-01-dashboard.jpg" width="230" alt="Dashboard on iPhone">
+  <img src="Images/iphone-03-device-detail.jpg" width="230" alt="Device detail on iPhone">
+  <img src="Images/iphone-04-assistant.jpg" width="230" alt="Fleet Assistant on iPhone">
+</p>
 
 ## Table Of Contents
 
