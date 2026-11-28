@@ -109,7 +109,7 @@ At a practical level, the current codebase supports all of the following:
 - generate, preview (paginated PDFKit), compare, and export **Reports** (Fleet Security Audit, Device Logs Audit, Inventory, Executive Summary, Configuration Backup, and Custom Reports with reusable templates) as PDF, Markdown, CSV, Word (`.docx`), and Excel (`.xlsx`)
 - schedule daily or weekly **Fleet Digests** comparing complete sync snapshots with opt-in local notifications, PDF/CSV export, and optional on-demand AI narrative
 - track frozen assignment-group cohorts against a minimum OS target and deadline in **OS Update Rollouts**, with deadline follow-up digests and spreadsheet-safe CSV exports
-- query the fleet and run approval-gated operations in the **Assistant** tab across **7 AI engines** (on-device Apple Intelligence, bundled `llama.cpp`/Qwen3, Ollama, Claude, OpenRouter, GitHub Copilot Models, and OpenAI / Codex) with **214 tools**, native Markdown rendering, interactive Swift Charts, and fullscreen table/chart expand viewers
+- query the fleet and run approval-gated operations in the **Assistant** tab across **7 AI engines** (on-device Apple Intelligence, bundled `llama.cpp`/Qwen3, Ollama, Claude, OpenRouter, GitHub Copilot Models, and OpenAI / Codex) with **224 tools**, native Markdown rendering, interactive Swift Charts, and fullscreen table/chart expand viewers
 - summarize DEP server token status on the dashboard and surface a token-expiry action item when renewal is needed
 - view the push certificate expiry date and see a prominent warning banner when it is within 30 days
 - review dashboard Action Items and customize which triage signals are shown
@@ -192,7 +192,7 @@ The current persistence model includes cached fleet data, launch snapshots, reso
 
 ## Platform Support
 
-The project is a shared SwiftUI app for Apple platforms.
+The project is a shared SwiftUI app for Apple platforms. Minimum versions: iOS and iPadOS 18.0, macOS 14.6, visionOS 26.2. The Apple Intelligence engine additionally needs macOS 26 or iOS 26 with Apple Intelligence turned on.
 
 Current platform-specific behavior includes:
 
@@ -1188,7 +1188,7 @@ What you get back:
 - **Model switch**: the chat menu's Model item changes the engine (and the Claude model) without leaving the chat; cloud engines still show the cloud notice first.
 - **Chat history** is kept per account, with its report attachments, and is cleared with the account. Each chat bubble has a menu to share that message or delete it from the history.
 - **Write audit trail**: every assistant action you approve or cancel is saved per account and survives restarts, clearing the chat, and deleting a bubble. Ask for the write audit log.
-- **Cloud engines never receive secrets from fleet configuration**: passwords, tokens, keys, and certificate data in profiles, declarations, scripts, and managed app configs are redacted before they are sent. On-device engines see the full content.
+- **Cloud engines get a redacted copy of fleet configuration**: passwords, tokens, keys, and certificate data in profiles, declarations, scripts, managed app configs, script output, and logs are replaced before they are sent. The filter matches secret-looking key names and well-known token shapes (private key blocks, JWTs, Bearer credentials, common provider token prefixes), so a secret with neither can still be sent. On-device engines see the full content.
 - **A footer** on every answer naming the engine, the token count, and, for cloud engines, that the request was sent to that provider.
 
 The side panel (`Fleet brief` on Mac and iPad) shows the compact fleet summary the model sees on every turn.
