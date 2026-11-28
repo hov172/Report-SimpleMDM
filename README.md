@@ -1165,6 +1165,25 @@ Keys and tokens go into the Keychain, one entry per provider, and are sent only 
 
 The first time you send a message through a cloud engine, a privacy sheet explains what is sent (your question, the fleet brief, and the results of any tools the model calls) and must be accepted once. On-device engines and Ollama never show it. See [docs/privacy/cloud-assistant.md](docs/privacy/cloud-assistant.md).
 
+#### Set up a cloud engine, step by step
+
+1. Open `Settings > Assistant`. Each cloud provider has its own card: Claude, then OpenRouter, GitHub Copilot Models and OpenAI / Codex.
+2. Create a key or token at the provider. Each card links to the right page (`Get an API key`, or `Create a token` for GitHub):
+
+| Provider | Create it at | Field on the card | Default model |
+|---|---|---|---|
+| Claude | `console.anthropic.com/settings/keys` | `API Key` (`sk-ant-…`) | Claude Sonnet 5.5. The `Model` picker also offers Claude Haiku 5.5 (fastest) and Claude Opus 5.5 (strongest). |
+| OpenRouter | `openrouter.ai/keys` | `API Key` (`sk-or-…`) | `anthropic/claude-sonnet-4.5` |
+| GitHub Copilot Models | `github.com/settings/personal-access-tokens`, with the `models` permission | `Personal Access Token` (`github_pat_…` or `ghp_…`) | `openai/gpt-4.1` |
+| OpenAI / Codex | `platform.openai.com/api-keys` | `API Key` (`sk-…`) | `gpt-4.1` |
+
+3. Paste it into the field. It is stored in the Keychain and sent only to that provider's endpoint. To change a key, paste the new one over the old one.
+4. For OpenRouter, GitHub and OpenAI, tap `Load models` and pick one, or type a model id. The model must support tool calling, because the assistant answers by calling tools. Claude uses its `Model` picker instead.
+5. Choose that engine in the engine picker on the same screen.
+6. Open the `Assistant` tab and ask a question. Accept the one-time privacy sheet. A cloud answer is labelled `Sent to <Provider>` with its input, output and cached token counts, which confirms the cloud engine answered.
+
+You are billed by the provider on your own account; the app's developer never sees your key, prompts or answers.
+
 ### Step 2: Ask Something
 
 Open the `Assistant` tab. Every engine reads the same local cache that the rest of the app uses, so sync first if the data looks stale. Prompts that work well:
@@ -1485,6 +1504,25 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 **Saved account not switching**
 1. Tap the account row in `Settings > Saved Accounts`.
 2. Confirm the confirmation dialog before the switch is applied.
+
+**Cloud engine says "The API key was rejected"**
+1. The provider returned 401 or 403. Copy the key into its card in `Settings > Assistant` again and check it was not revoked.
+2. GitHub Copilot Models: the token needs the `models` permission and an active Copilot subscription.
+3. Tap `Load models` on the card as a quick test. It uses the same key and shows the same message.
+
+**`Load models` shows nothing, or "The server returned no models."**
+1. Confirm the key (or, for Ollama, the server address) is filled in. The button is disabled without a key.
+2. Ollama: run `ollama list` on the server and check the address is reachable from this device.
+
+**"Could not reach <Provider>"**
+1. Check the network, VPN or firewall. The app connects straight to the provider (`api.anthropic.com`, `openrouter.ai`, `models.github.ai`, `api.openai.com`).
+2. Ollama on a phone: use your Mac's LAN address and start Ollama with `OLLAMA_HOST=0.0.0.0`.
+
+**"<Provider> returned 429" or another status**
+1. The app retries 429 and 5xx responses with backoff before showing an error. A persistent 429 or a quota message means the provider account is out of rate limit or credit. Fix it with the provider.
+
+**The assistant ignores fleet tools or answers without fleet data**
+1. The chosen model may not support tool calling. Pick another one from `Load models`.
 
 ## Glossary
 
