@@ -8,7 +8,7 @@ The app is designed first as a standalone SimpleMDM operations client. Optional 
 
 - **iOS and iPadOS (App Store):** [ReportSimpleMDM on the App Store](https://apps.apple.com/us/app/reportsimplemdm/id6760626379)
 - **macOS (Mac App Store):** [ReportSimpleMDM on the Mac App Store](https://apps.apple.com/us/app/reportsimplemdm/id6760626379?platform=mac)
-- **macOS (direct):** notarized DMG of [2.0.0 (Build 17)](https://github.com/hov172/Report-SimpleMDM/releases/tag/v2.0.0-build17). From 2.1.0 the app is larger than GitHub's 2 GiB limit per release file, so newer Mac builds ship through the Mac App Store and TestFlight only
+- **macOS (direct):** notarized DMG of [2.1.4 (Build 24)](https://github.com/hov172/Report-SimpleMDM/releases/tag/v2.1.4-build24), split into two files because the app is larger than GitHub's 2 GiB limit per release file. Download both files into one folder and open the `.dmg`. The Mac App Store and TestFlight carry every build.
 - **iOS (TestFlight):** [Join the public beta](https://testflight.apple.com/join/JMh5jvXY) to get builds before they reach the App Store
 
 ---
@@ -1494,6 +1494,10 @@ See [PRIVACY.md](PRIVACY.md) and [docs/privacy/cloud-assistant.md](docs/privacy/
 | Webhook | An HTTP endpoint that SimpleMDM notifies when specific MDM events occur |
 
 ## Changelog And Release History
+
+### 2.1.4 (Build 24)
+
+- **The Assistant's OS summary says what it leaves out** — it counts enrolled devices only, so a reply could present that count as the fleet total. The result now says how many devices are not enrolled and not included.
 
 ### 2.1.3 (Build 23)
 
